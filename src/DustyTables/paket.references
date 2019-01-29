@@ -1,0 +1,4 @@
+FSharp.Core
+SourceLink.Create.CommandLine
+TaskBuilder.fs
+System.Data.SqlClient
