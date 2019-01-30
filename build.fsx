@@ -343,4 +343,4 @@ Target.create "Release" ignore
  ==> "WatchTests"
 
 
-Target.runOrDefaultWithArguments "DotnetPack"
+Target.runOrDefaultWithArguments "DotnetBuild"
