@@ -93,7 +93,11 @@ module Sql =
         
     let toBinary = function
         | SqlValue.Binary bytes -> bytes
-        | value -> failwithf "Could not convert %A into binary (byte[]) value" value
+        | value -> failwithf "Could not convert %A into binary (i.e. byte[]) value" value
+
+    let toDecimal = function
+        | SqlValue.Decimal value -> value
+        | value -> failwithf "Could not convert %A into decimal value" value
  
     let readValue value =
         let valueType = value.GetType()

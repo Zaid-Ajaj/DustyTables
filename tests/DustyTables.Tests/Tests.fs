@@ -73,7 +73,7 @@ let tests = testList "DustyTables" [
              | Error ex -> pass()
              | Ok _ -> fail()
 
-      testCase "NULL values are skipped" <| fun _ ->
+      testCase "NULL values are skipped when using option workflow" <| fun _ ->
           dustyTablesDb
           |> Sql.connect
           |> Sql.query "select * from (values (1, NULL), (2, N'john')) as users(id, username)"
@@ -87,4 +87,99 @@ let tests = testList "DustyTables" [
           |> function 
              | [ (2, "john") ] -> pass()
              | otherwise -> fail()
+
+      testCase "Executing stored procedure" <| fun _ ->
+          dustyTablesDb
+          |> Sql.connect
+          |> Sql.storedProcedure "sp_executesql"
+          |> Sql.parameters [ "@stmt", SqlValue.String "SELECT 42 AS A" ]
+          |> Sql.executeScalar
+          |> function
+             | SqlValue.Int 42 -> pass()
+             | otherwise -> fail()
+
+      testCase "Executing parameterized function in query" <| fun _ ->
+          dustyTablesDb
+          |> Sql.connect
+          |> Sql.query "SELECT LOWER(@inputText)"
+          |> Sql.parameters [ "@inputText", SqlValue.String "TEXT" ]
+          |> Sql.executeScalar
+          |> function
+             | SqlValue.String "text" -> pass()
+             | otherwise -> fail()
+
+      testCase "Reading different number formats" <| fun _ ->
+          dustyTablesDb
+          |> Sql.connect
+          |> Sql.queryStatements [
+              "select *"
+              "from (values(cast(1 as tinyint), cast(1 as smallint), cast(1 as bigint)))"
+              "as numbers(tiny, small, big)"
+            ]
+          |> Sql.executeTable
+          |> Sql.mapEachRow (fun row ->
+                option {
+                    let! tiny = Sql.readTinyInt "tiny" row
+                    let! small = Sql.readSmallInt "small" row
+                    let! big = Sql.readBigInt "big" row
+                    return (tiny, small, big)
+                })
+          |> function
+             | [ tiny, small, big ] ->
+                Expect.equal tiny (uint8 1) "Tiny is correct"
+                Expect.equal small (int16 1) "Small is correct"
+                Expect.equal big (int64 1) "big is correct"
+             | otherwise ->
+                fail()
+
+      testCase "number formats roundtrip" <| fun _ ->
+          dustyTablesDb
+          |> Sql.connect
+          |> Sql.query "select * from (values(@xs, @s, @l)) as numbers(xs, s, l)"
+          |> Sql.parameters [
+                "@xs", SqlValue.TinyInt (uint8 200)
+                "@s", SqlValue.Smallint (int16 42)
+                "@l", SqlValue.Bigint (int64 1) ]
+          |> Sql.executeTable
+          |> Sql.mapEachRow (fun row ->
+                option {
+                    let! tiny = Sql.readTinyInt "xs" row
+                    let! small = Sql.readSmallInt "s" row
+                    let! big = Sql.readBigInt "l" row
+                    return (tiny, small, big)
+                })
+          |> function
+            [ tiny, small, big ] ->
+                Expect.equal tiny (uint8 200) "Tiny is correct"
+                Expect.equal small (int16 42) "Small is correct"
+                Expect.equal big (int64 1) "big is correct"
+             | otherwise ->
+                fail()
+
+      testCase "binary roundtrip" <| fun _ ->
+          dustyTablesDb
+          |> Sql.connect
+          |> Sql.query "select @blob"
+          |> Sql.parameters [ "@blob", SqlValue.Binary [| byte 1; byte 2; byte 3 |] ]
+          |> Sql.executeScalar
+          |> function
+             | SqlValue.Binary bytes -> Expect.equal bytes [| byte 1; byte 2; byte 3 |] "bytes are the same"
+             | otherwise -> fail()
+
+      testCase "reading money as decimal" <| fun _ ->
+          dustyTablesDb
+          |> Sql.connect
+          |> Sql.query "select cast(1.2345 as money)"
+          |> Sql.executeScalar
+          |> Sql.toDecimal
+          |> fun value -> Expect.equal value 1.2345M "decimal is correct"
+
+      testCase "decimal roundtrip" <| fun _ ->
+          dustyTablesDb
+          |> Sql.connect
+          |> Sql.query "select @value"
+          |> Sql.parameters [ "@value", SqlValue.Decimal 1.234567M ]
+          |> Sql.executeScalar
+          |> Sql.toDecimal
+          |> fun value -> Expect.equal value 1.234567M "decimal is correct"
   ] 
