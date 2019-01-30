@@ -158,7 +158,7 @@ let userExists (username: string) : Async<bool> =
         let! userExists = 
             connectionString()
             |> Sql.connect
-            |> Sql.storedProdecure "user_exists"
+            |> Sql.storedProcedure "user_exists"
             |> Sql.parameters [ "@username", SqlValue.String username ]
             |> Sql.executeScalarAsync 
         
