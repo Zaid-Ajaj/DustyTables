@@ -166,6 +166,10 @@ let userExists (username: string) : Async<bool> =
     }
 ```
 
+## Running Tests locally
+
+You only need a connection string to a working database, no tables/stored procedures/anything is requires. Just set environment variable `DUSTY_TABLES_DB` To your connection string and run the tests
+
 
 ## Builds
 
