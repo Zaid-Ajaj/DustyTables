@@ -174,6 +174,26 @@ let tests = testList "DustyTables" [
           |> Sql.toDecimal
           |> fun value -> Expect.equal value 1.2345M "decimal is correct"
 
+      testCase "Simpy reading a single column from table" <| fun _ ->
+          dustyTablesDb
+          |> Sql.connect
+          |> Sql.query "select name from (values(N'one'), (N'two'), (N'three')) as numbers(name)"
+          |> Sql.executeTable
+          |> Sql.mapEachRow (Sql.readString "name")
+          |> function
+             | [ "one"; "two"; "three" ] -> pass()
+             | otherwise -> fail()
+
+      testCase "reading count as integer" <| fun _ ->
+          dustyTablesDb
+          |> Sql.connect
+          |> Sql.query "select count(*) from (values(1, 2)) as numbers(one, two)"
+          |> Sql.executeScalar
+          |> Sql.toInt
+          |> function
+              | 1 -> pass()
+              | _ -> fail()
+
       testCase "decimal roundtrip" <| fun _ ->
           dustyTablesDb
           |> Sql.connect

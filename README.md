@@ -1,8 +1,171 @@
 # DustyTables
 
-A thin functional wrapper around plain old (dusty?) `SqlClient` to simplify data access when talking to MS Sql Server databases. 
+Functional wrapper around plain old (dusty?) `SqlClient` to simplify data access when talking to MS Sql Server databases. 
 
----
+## Install
+```bash
+# nuget client
+dotnet add package DustyTables
+
+# or using paket
+.paket/paket.exe add DustyTables --project path/to/project.fsproj
+```
+
+## Query a table
+```fs
+open DustyTables
+open DustyTables.OptionWorkflow
+
+// get the connection from the environment
+let connectionString() = Env.getVar "app_db"
+
+type User = { Id: int; Username: string }
+
+let getUsers() : User list = 
+    connectionString()
+    |> Sql.connect
+    |> Sql.query "select * from dbo.[users]"
+    |> Sql.executeTable 
+    |> Sql.mapEachRow (fun row -> 
+        option {
+            let! id = Sql.readInt "user_id" row
+            let! username = Sql.readString "username" row
+            return { Id = id; Username = username }
+        })
+```
+Notice that we are using the `option` workflow which means if any row has "user_id" or "username" as NULL it will be skipped
+
+## Handle null values from table columns:
+```fs
+open DustyTables
+open DustyTables.OptionWorkflow
+
+// get the connection from the environment
+let connectionString() = Env.getVar "app_db"
+
+type User = { Id: int; Username: string; LastModified : Option<DateTime> }
+
+let getUsers() : User list = 
+    connectionString()
+    |> Sql.connect
+    |> Sql.query "select * from dbo.[users]"
+    |> Sql.executeTable 
+    |> Sql.mapEachRow (fun row -> 
+        option {
+            let! id = Sql.readInt "user_id" row
+            let! username = Sql.readString "username" row
+            // using "let" instead of "let!"
+            let lastModified = Sql.readDateTime "last_modified" row
+            return { 
+                Id = id; 
+                Username = username
+                LastModified = lastModified  
+            }
+        })
+```
+## Providing default values for null columns:
+```fs
+open DustyTables
+open DustyTables.OptionWorkflow
+
+// get the connection from the environment
+let connectionString() = Env.getVar "app_db"
+
+type User = { Id: int; Username: string; Biography : string }
+
+let getUsers() : User list = 
+    connectionString()
+    |> Sql.connect
+    |> Sql.query "select * from dbo.[users]"
+    |> Sql.executeTable 
+    |> Sql.mapEachRow (fun row -> 
+        option {
+            let! id = Sql.readInt "user_id" row
+            let! username = Sql.readString "username" row
+            let userBiography = Sql.readString "bio" row
+            return { 
+                Id = id; 
+                Username = username
+                Biography = defaultArg userBiography ""
+            }
+        })
+```
+## Query a scalar value safely:
+```fs
+open DustyTables
+open DustyTables.OptionWorkflow
+
+// get the connection from the environment
+let connectionString() = Env.getVar "app_db"
+
+let pingDatabase() : Option<DateTime> = 
+    connectionString()
+    |> Sql.connect
+    |> Sql.query "select getdate()"
+    |> Sql.executeScalarSafe 
+    |> function 
+        | Ok (SqlValue.DateTime time) -> Some time
+        | otherwise -> None
+```
+### Query a scalar value asynchronously
+```fs
+open DustyTables
+open DustyTables.OptionWorkflow
+
+// get the connection from the environment
+let connectionString() = Env.getVar "app_db"
+
+let pingDatabase() : Async<Option<DateTime>> = 
+    async {
+        let! serverTime = 
+            connectionString()
+            |> Sql.connect
+            |> Sql.query "select getdate()"
+            |> Sql.executeScalarSafeAsync
+        
+        match serverTime with 
+        | Ok (SqlValue.DateTime time) -> return Some time
+        | otherwise -> return None
+    }
+```
+## Execute a parameterized query
+```fs
+open DustyTables
+open DustyTables.OptionWorkflow
+
+// get the connection from the environment
+let connectionString() = Env.getVar "app_db"
+
+// get product names by category
+let productsByCategory (category: string) : string list = 
+    connectionString()
+    |> Sql.connect
+    |> Sql.query "select name from dbo.[products] where category = @category"
+    |> Sql.parameters [ "@category", SqlValue.String category ]
+    |> Sql.executeTable
+    |> Sql.mapEachRow (Sql.readString "name")
+```
+### Executing a stored procedure with parameters
+```fs
+open DustyTables
+
+// get the connection from the environment
+let connectionString() = Env.getVar "app_db"
+
+// check whether a user exists or not
+let userExists (username: string) : Async<bool> = 
+    async {
+        let! userExists = 
+            connectionString()
+            |> Sql.connect
+            |> Sql.storedProdecure "user_exists"
+            |> Sql.parameters [ "@username", SqlValue.String username ]
+            |> Sql.executeScalarAsync 
+        
+        return Sql.toBool userExists 
+    }
+```
+
 
 ## Builds
 

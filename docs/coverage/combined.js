@@ -325,9 +325,9 @@ var assemblies = [
   {
     "name": "DustyTables",
     "classes": [
-      { "name": "DustyTables.OptionWorkflow.OptionBuilder", "reportPath": "DustyTables_OptionBuilder.htm", "coveredLines": 3, "uncoveredLines": 2, "coverableLines": 5, "totalLines": 12, "coverageType": "LineCoverage", "methodCoverage": "-", "coveredBranches": 0, "totalBranches": 0, "lineCoverageHistory": [], "branchCoverageHistory": [], "historicCoverages": [] },
+      { "name": "DustyTables.OptionWorkflow.OptionBuilder", "reportPath": "DustyTables_OptionBuilder.htm", "coveredLines": 0, "uncoveredLines": 5, "coverableLines": 5, "totalLines": 12, "coverageType": "LineCoverage", "methodCoverage": "-", "coveredBranches": 0, "totalBranches": 0, "lineCoverageHistory": [], "branchCoverageHistory": [], "historicCoverages": [] },
       { "name": "DustyTables.OptionWorkflow.OptionBuilderImplementation", "reportPath": "DustyTables_OptionBuilderImplementation.htm", "coveredLines": 0, "uncoveredLines": 0, "coverableLines": 0, "totalLines": 0, "coverageType": "MethodCoverage", "methodCoverage": 0, "coveredBranches": 0, "totalBranches": 0, "lineCoverageHistory": [], "branchCoverageHistory": [], "historicCoverages": [] },
-      { "name": "DustyTables.Sql", "reportPath": "DustyTables_Sql.htm", "coveredLines": 111, "uncoveredLines": 166, "coverableLines": 277, "totalLines": 439, "coverageType": "LineCoverage", "methodCoverage": "-", "coveredBranches": 53, "totalBranches": 132, "lineCoverageHistory": [], "branchCoverageHistory": [], "historicCoverages": [] },
+      { "name": "DustyTables.Sql", "reportPath": "DustyTables_Sql.htm", "coveredLines": 97, "uncoveredLines": 157, "coverableLines": 254, "totalLines": 439, "coverageType": "LineCoverage", "methodCoverage": "-", "coveredBranches": 44, "totalBranches": 120, "lineCoverageHistory": [], "branchCoverageHistory": [], "historicCoverages": [] },
       { "name": "DustyTables.SqlValue", "reportPath": "DustyTables_SqlValue.htm", "coveredLines": 0, "uncoveredLines": 0, "coverableLines": 0, "totalLines": 0, "coverageType": "MethodCoverage", "methodCoverage": "-", "coveredBranches": 0, "totalBranches": 0, "lineCoverageHistory": [], "branchCoverageHistory": [], "historicCoverages": [] },
       { "name": "System.AssemblyVersionInformation", "reportPath": "DustyTables_AssemblyVersionInformation.htm", "coveredLines": 0, "uncoveredLines": 0, "coverableLines": 0, "totalLines": 0, "coverageType": "MethodCoverage", "methodCoverage": "-", "coveredBranches": 0, "totalBranches": 0, "lineCoverageHistory": [], "branchCoverageHistory": [], "historicCoverages": [] },
     ]},
@@ -343,18 +343,11 @@ var riskHotspotMetrics = [
 
 var riskHotspots = [
   {
-    "assembly": "DustyTables", "class": "DustyTables.Sql", "reportPath": "DustyTables_Sql.htm", "methodName": "DustyTables.SqlValue DustyTables.Sql::readValue(a)", "methodShortName": "readValue(...)", "fileIndex": 0, "line": 103,
-    "metrics": [
-      { "value": 14, "exceeded": false },
-      { "value": 4096, "exceeded": true },
-      { "value": 15.39, "exceeded": true },
-    ]},
-  {
     "assembly": "DustyTables", "class": "DustyTables.Sql", "reportPath": "DustyTables_Sql.htm", "methodName": "System.Void DustyTables.Sql::populateCmd(System.Data.SqlClient.SqlCommand,DustyTables.Sql/SqlProps)", "methodShortName": "populateCmd(...)", "fileIndex": 0, "line": 261,
     "metrics": [
-      { "value": 17, "exceeded": false },
+      { "value": 16, "exceeded": false },
       { "value": 192, "exceeded": false },
-      { "value": 25.25, "exceeded": true },
+      { "value": 24.73, "exceeded": true },
     ]},
 ];
 
