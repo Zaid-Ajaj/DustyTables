@@ -6,7 +6,7 @@
   </PropertyGroup>
   <PropertyGroup>
     <Title>DustyTables</Title>
-    <Description>DustyTables does the thing!</Description>
+    <Description>Thin F# API for SqlClient for easy data access to ms sql server with functional seasoning on top</Description>
     <!-- summary is not migrated from project.json, but you can use the <Description> property for that if needed. -->
     <PackageTags>f#, fsharp</PackageTags>
     <PackageProjectUrl>https://github.com/zaid-ajaj/DustyTables</PackageProjectUrl>
