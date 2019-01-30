@@ -11,7 +11,7 @@ type SqlValue =
     | Int of int
     | Bigint of int64
     | String of string
-    | Date of DateTime
+    | DateTime of DateTime
     | DateTimeOffset of DateTimeOffset
     | Bool of bool
     | Float of double
@@ -80,7 +80,7 @@ module Sql =
         | value -> failwithf "Could not convert %A into a string" value
 
     let toDateTime = function
-        | SqlValue.Date x -> x
+        | SqlValue.DateTime x -> x
         | value -> failwithf "Could not convert %A into a DateTime" value
 
     let toDateTimeOffset = function 
@@ -114,7 +114,7 @@ module Sql =
         elif valueType = typeof<decimal>
         then SqlValue.Decimal (unbox<decimal> value)
         elif valueType = typeof<DateTime> 
-        then SqlValue.Date (unbox<DateTime> value)
+        then SqlValue.DateTime (unbox<DateTime> value)
         elif valueType = typeof<DateTimeOffset> 
         then SqlValue.DateTimeOffset (unbox<DateTimeOffset> value)
         elif valueType = typeof<byte[]>
@@ -163,12 +163,12 @@ module Sql =
             | Some (SqlValue.String value) -> Some value
             | _ -> None
 
-    let readDate name (row: SqlRow) =
+    let readDateTime name (row: SqlRow) =
         row
         |> List.tryFind (fun (colName, value) -> colName = name)
         |> Option.map snd
         |> function
-            | Some (SqlValue.Date value) -> Some value
+            | Some (SqlValue.DateTime value) -> Some value
             | _ -> None
 
     let readBool name (row: SqlRow) =
@@ -268,8 +268,8 @@ module Sql =
                 | SqlValue.Smallint x -> upcast x
                 | SqlValue.Int i -> upcast i
                 | SqlValue.Bigint x -> upcast x
-                | SqlValue.Date date -> upcast date
-                | SqlValue. Float n -> upcast n
+                | SqlValue.DateTime date -> upcast date
+                | SqlValue.Float n -> upcast n
                 | SqlValue.Bool b -> upcast b
                 | SqlValue.Decimal x -> upcast x
                 | SqlValue.Null -> upcast DBNull.Value
