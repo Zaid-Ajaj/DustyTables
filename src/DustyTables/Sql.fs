@@ -6,14 +6,15 @@ open System.Data
 
 [<RequireQualifiedAccess>]
 type SqlValue =
-    | Short of int16
+    | TinyInt of uint8
+    | Smallint of int16
     | Int of int
-    | Long of int64
+    | Bigint of int64
     | String of string
     | Date of DateTime
     | DateTimeOffset of DateTimeOffset
     | Bool of bool
-    | Number of double
+    | Float of double
     | Decimal of decimal
     | Binary of byte[]
     | Null
@@ -48,6 +49,7 @@ module Sql =
     let connect constr  = { defaultProps() with ConnectionString = constr }
 
     let query (sqlQuery: string) props = { props with SqlQuery = Some sqlQuery }
+    let queryStatements (sqlQuery: string list) props = { props with SqlQuery = Some (String.concat "\n" sqlQuery) }
     let storedProcedure (sqlQuery: string) props = { props with SqlQuery = Some sqlQuery; IsFunction = true }
     let prepare  props = { props with NeedPrepare = true}
     let parameters ls props = { props with Parameters = ls }
@@ -57,16 +59,20 @@ module Sql =
         | SqlValue.Bool x -> x
         | value -> failwithf "Could not convert %A into a boolean value" value
 
-    let toShort = function 
-        | SqlValue.Short x -> x 
+    let toTinyint = function
+        | SqlValue.TinyInt x -> x
+        | value -> failwithf "Could not convert %A into a tinyint" value
+
+    let toSmallint = function 
+        | SqlValue.Smallint x -> x 
         | value -> failwithf "Could not convert %A into a short (int16)" value 
         
     let toInt = function
         | SqlValue.Int x -> x
         | value -> failwithf "Could not convert %A into an integer" value
 
-    let toLong = function 
-        | SqlValue.Long x -> x
+    let toBigint = function 
+        | SqlValue.Bigint x -> x
         | value -> failwithf "Could not convert %A into long (int64)" value
 
     let toString = function
@@ -82,7 +88,7 @@ module Sql =
         | value -> failwithf "Could not convert %A into a DateTimeOffset" value
 
     let toFloat = function
-        | SqlValue.Number x -> x
+        | SqlValue.Float x -> x
         | value -> failwithf "Could not convert %A into a floating number" value
         
     let toBinary = function
@@ -93,16 +99,18 @@ module Sql =
         let valueType = value.GetType()
         if isNull value 
         then SqlValue.Null
+        elif valueType = typeof<uint8> 
+        then SqlValue.TinyInt (unbox<uint8> value)
         elif valueType = typeof<int16> 
-        then SqlValue.Short (unbox<int16> value)
+        then SqlValue.Smallint (unbox<int16> value)
         elif valueType = typeof<int32>
         then SqlValue.Int (unbox<int32> value)
         elif valueType = typeof<int64> 
-        then SqlValue.Long (unbox<int64> value)
+        then SqlValue.Bigint (unbox<int64> value)
         elif valueType = typeof<bool>
         then SqlValue.Bool (unbox<bool> value)
         elif valueType = typeof<float> 
-        then SqlValue.Number (unbox<float> value)
+        then SqlValue.Float (unbox<float> value)
         elif valueType = typeof<decimal>
         then SqlValue.Decimal (unbox<decimal> value)
         elif valueType = typeof<DateTime> 
@@ -115,13 +123,20 @@ module Sql =
         then SqlValue.String (unbox<string> value)
         else failwithf "Could not convert value of type '%s' to SqlValue" (valueType.FullName)
  
-  
-    let readShort name (row: SqlRow) = 
+    let readTinyInt name (row: SqlRow) = 
         row
         |> List.tryFind (fun (colName, value) -> colName = name)
         |> Option.map snd 
         |> function 
-            | Some (SqlValue.Short value) -> Some value
+            | Some (SqlValue.TinyInt value) -> Some value
+            | _ -> None       
+  
+    let readSmallInt name (row: SqlRow) = 
+        row
+        |> List.tryFind (fun (colName, value) -> colName = name)
+        |> Option.map snd 
+        |> function 
+            | Some (SqlValue.Smallint value) -> Some value
             | _ -> None
 
     let readInt name (row: SqlRow) =
@@ -132,12 +147,12 @@ module Sql =
             | Some (SqlValue.Int value) -> Some value
             | _ -> None
 
-    let readLong name (row: SqlRow)  =
+    let readBigInt name (row: SqlRow)  =
         row
         |> List.tryFind (fun (colName, value) -> colName = name)
         |> Option.map snd
         |> function
-            | Some (SqlValue.Long value) -> Some value
+            | Some (SqlValue.Bigint value) -> Some value
             | _ -> None
 
     let readString name (row: SqlRow) =
@@ -172,12 +187,12 @@ module Sql =
             | Some (SqlValue.Decimal value) -> Some value
             | _ -> None
 
-    let readNumber name (row: SqlRow) =
+    let readFloat name (row: SqlRow) =
         row
         |> List.tryFind (fun (colName, value) -> colName = name)
         |> Option.map snd
         |> function
-            | Some (SqlValue.Number value) -> Some value
+            | Some (SqlValue.Float value) -> Some value
             | _ -> None
 
     let readDateTimeOffset name (row: SqlRow) = 
@@ -240,18 +255,23 @@ module Sql =
 
     let private populateCmd (cmd: SqlCommand) (props: SqlProps) =
         if props.IsFunction then cmd.CommandType <- CommandType.StoredProcedure
+        
+        match props.Timeout with 
+        | Some timeout -> cmd.CommandTimeout <- timeout 
+        | None -> () 
 
         for param in props.Parameters do
             let paramValue : obj =
                 match snd param with
                 | SqlValue.String text -> upcast text
+                | SqlValue.TinyInt x -> upcast x
+                | SqlValue.Smallint x -> upcast x
                 | SqlValue.Int i -> upcast i
-                | SqlValue.Short x -> upcast x
+                | SqlValue.Bigint x -> upcast x
                 | SqlValue.Date date -> upcast date
-                | SqlValue. Number n -> upcast n
+                | SqlValue. Float n -> upcast n
                 | SqlValue.Bool b -> upcast b
                 | SqlValue.Decimal x -> upcast x
-                | SqlValue.Long x -> upcast x
                 | SqlValue.Null -> upcast DBNull.Value
                 | SqlValue.Binary bytes -> upcast bytes
                 | SqlValue.DateTimeOffset x -> upcast x
