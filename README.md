@@ -175,8 +175,8 @@ You only need a connection string to a working database, no tables/stored proced
 
 MacOS/Linux | Windows
 --- | ---
-[![Travis Badge](https://travis-ci.org/zaid-ajaj/DustyTables.svg?branch=master)](https://travis-ci.org/zaid-ajaj/DustyTables) | [![Build status](https://ci.appveyor.com/api/projects/status/github/zaid-ajaj/DustyTables?svg=true)](https://ci.appveyor.com/project/zaid-ajaj/DustyTables)
-[![Build History](https://buildstats.info/travisci/chart/zaid-ajaj/DustyTables)](https://travis-ci.org/zaid-ajaj/DustyTables/builds) | [![Build History](https://buildstats.info/appveyor/chart/zaid-ajaj/DustyTables)](https://ci.appveyor.com/project/zaid-ajaj/DustyTables)  
+[![Travis Badge](https://travis-ci.org/Zaid-Ajaj/DustyTables.svg?branch=master)](https://travis-ci.org/Zaid-Ajaj/DustyTables) | [![Build status](https://ci.appveyor.com/api/projects/status/github/Zaid-Ajaj/DustyTables?svg=true)](https://ci.appveyor.com/project/Zaid-Ajaj/DustyTables)
+[![Build History](https://buildstats.info/travisci/chart/Zaid-Ajaj/DustyTables)](https://travis-ci.org/Zaid-Ajaj/DustyTables/builds) | [![Build History](https://buildstats.info/appveyor/chart/Zaid-Ajaj/DustyTables)](https://ci.appveyor.com/project/Zaid-Ajaj/DustyTables)  
 
 
 ## Nuget 
