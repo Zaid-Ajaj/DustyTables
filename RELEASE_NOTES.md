@@ -1,3 +1,6 @@
+#### 0.3.0 - 2019-02-06
+* Add uniqueidentifier to scalars
+
 #### 0.2.0 - 2019-01-30
 * Update package description
 

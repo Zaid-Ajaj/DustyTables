@@ -166,6 +166,26 @@ let tests = testList "DustyTables" [
              | SqlValue.Binary bytes -> Expect.equal bytes [| byte 1; byte 2; byte 3 |] "bytes are the same"
              | otherwise -> fail()
 
+      testCase "reading unique identifier works" <| fun _ ->
+          dustyTablesDb
+          |> Sql.connect
+          |> Sql.query "select newid()"
+          |> Sql.executeScalar
+          |> function
+                | SqlValue.UniqueIdentifier value -> pass()
+                | otherwise -> fail()
+
+      testCase "unique identifier roundtrip" <| fun _ ->
+          let original = Guid.NewGuid()
+          dustyTablesDb
+          |> Sql.connect
+          |> Sql.query "select @identifier"
+          |> Sql.parameters [ "@identifier", SqlValue.UniqueIdentifier original ]
+          |> Sql.executeScalar
+          |> function
+                | SqlValue.UniqueIdentifier roundtripped -> Expect.equal original roundtripped "Roundtrip works"
+                | otherwise -> fail()
+
       testCase "reading money as decimal" <| fun _ ->
           dustyTablesDb
           |> Sql.connect

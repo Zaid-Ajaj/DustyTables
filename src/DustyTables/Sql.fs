@@ -17,6 +17,7 @@ type SqlValue =
     | Float of double
     | Decimal of decimal
     | Binary of byte[]
+    | UniqueIdentifier of Guid
     | Null
 
 type SqlRow = list<string * SqlValue>
@@ -125,6 +126,8 @@ module Sql =
         then SqlValue.Binary (unbox<byte[]> value)
         elif valueType = typeof<string>
         then SqlValue.String (unbox<string> value)
+        elif valueType = typeof<Guid>
+        then SqlValue.UniqueIdentifier (unbox<Guid> value)
         else failwithf "Could not convert value of type '%s' to SqlValue" (valueType.FullName)
  
     let readTinyInt name (row: SqlRow) = 
@@ -278,6 +281,7 @@ module Sql =
                 | SqlValue.Decimal x -> upcast x
                 | SqlValue.Null -> upcast DBNull.Value
                 | SqlValue.Binary bytes -> upcast bytes
+                | SqlValue.UniqueIdentifier guid -> upcast guid
                 | SqlValue.DateTimeOffset x -> upcast x
 
             // prepend param name with @ if it doesn't already
