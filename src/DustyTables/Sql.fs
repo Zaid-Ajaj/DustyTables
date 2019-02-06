@@ -99,6 +99,10 @@ module Sql =
     let toDecimal = function
         | SqlValue.Decimal value -> value
         | value -> failwithf "Could not convert %A into decimal value" value
+
+    let toUniqueIdentifier = function 
+        | SqlValue.UniqueIdentifier guid -> guid
+        | value ->  failwithf "Could not convert %A into Guid value" value
  
     let readValue value =
         let valueType = value.GetType()

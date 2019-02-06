@@ -1,3 +1,6 @@
+#### 0.4.0 - 2019-02-06
+* Add toUniqueIdentifier function
+
 #### 0.3.0 - 2019-02-06
 * Add uniqueidentifier to scalars
 

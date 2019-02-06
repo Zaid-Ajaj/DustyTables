@@ -302,11 +302,13 @@ Target.create "GitHubRelease" <| fun _ ->
 
    let files = !! distGlob
 
-   GitHub.createClientWithToken token
-   |> GitHub.draftNewRelease gitOwner gitRepoName release.NugetVersion (release.SemVer.PreRelease <> None) release.Notes
-   |> GitHub.uploadFiles files
-   |> GitHub.publishDraft
-   |> Async.RunSynchronously
+   //GitHub.createClientWithToken token
+   //|> GitHub.draftNewRelease gitOwner gitRepoName release.NugetVersion (release.SemVer.PreRelease <> None) release.Notes
+   //|> GitHub.uploadFiles files
+   //|> GitHub.publishDraft
+   //|> Async.RunSynchronously
+
+   ignore()
 
 Target.create "FormatCode" <| fun _ ->
     srcAndTest
