@@ -1,3 +1,6 @@
+#### 0.5.0 - 2019-02-06
+* Add readUniqueIdentifier function
+
 #### 0.4.0 - 2019-02-06
 * Add toUniqueIdentifier function
 

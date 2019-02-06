@@ -214,6 +214,14 @@ module Sql =
             | Some (SqlValue.DateTimeOffset value) -> Some value 
             | _ -> None
 
+    let readUniqueIdentifier name (row: SqlRow) = 
+        row 
+        |> List.tryFind (fun (colName, value) -> colName = name)
+        |> Option.map snd
+        |> function 
+            | Some (SqlValue.UniqueIdentifier value) -> Some value
+            | _ -> None
+
     let readRow (reader : SqlDataReader) : SqlRow =
 
         let readFieldSync fieldIndex =
