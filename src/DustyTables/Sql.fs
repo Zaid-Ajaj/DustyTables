@@ -272,14 +272,8 @@ module Sql =
         readTableTask reader
         |> Async.AwaitTask
 
-    let private populateCmd (cmd: SqlCommand) (props: SqlProps) =
-        if props.IsFunction then cmd.CommandType <- CommandType.StoredProcedure
-        
-        match props.Timeout with 
-        | Some timeout -> cmd.CommandTimeout <- timeout 
-        | None -> () 
-
-        for param in props.Parameters do
+    let populateRow (cmd: SqlCommand) (row: SqlRow) = 
+        for param in row do
             let paramValue : obj =
                 match snd param with
                 | SqlValue.String text -> upcast text
@@ -303,6 +297,110 @@ module Sql =
                 else sprintf "@%s" (fst param)
 
             cmd.Parameters.AddWithValue(paramName, paramValue) |> ignore
+
+    let private populateCmd (cmd: SqlCommand) (props: SqlProps) =
+        if props.IsFunction then cmd.CommandType <- CommandType.StoredProcedure
+        
+        match props.Timeout with 
+        | Some timeout -> cmd.CommandTimeout <- timeout 
+        | None -> () 
+
+        populateRow cmd props.Parameters
+
+    let executeReader (read: SqlDataReader -> Option<'t>) (props: SqlProps) : 't list = 
+        if Option.isNone props.SqlQuery then failwith "No query provided to execute"
+        use connection = new SqlConnection(props.ConnectionString)
+        connection.Open()
+        use command = new SqlCommand(Option.get props.SqlQuery, connection)
+        if props.NeedPrepare then command.Prepare()
+        populateCmd command props
+        use reader = command.ExecuteReader()
+        let rows = ResizeArray<'t>()
+        while reader.Read() do
+            reader 
+            |> read
+            |> Option.iter rows.Add
+        List.ofSeq rows 
+
+    let executeTransaction queries (props: SqlProps)  = 
+        if List.isEmpty queries  
+        then [ ]
+        else 
+        use connection = new SqlConnection(props.ConnectionString)
+        connection.Open()
+        use transaction = connection.BeginTransaction()
+        let affectedRowsByQuery = ResizeArray<int>()
+        for (query, parameterSets) in queries do
+            for parameterSet in parameterSets do
+                use command = new SqlCommand(query, connection, transaction)
+                populateRow command parameterSet
+                let affectedRows = command.ExecuteNonQuery() 
+                affectedRowsByQuery.Add affectedRows
+        transaction.Commit()
+        List.ofSeq affectedRowsByQuery
+
+    let executeTransactionSafe queries (props: SqlProps) = 
+        try 
+            if List.isEmpty queries  
+            then Ok [ ]
+            else 
+            use connection = new SqlConnection(props.ConnectionString)
+            connection.Open()
+            use transaction = connection.BeginTransaction()
+            let affectedRowsByQuery = ResizeArray<int>()
+            for (query, parameterSets) in queries do
+                for parameterSet in parameterSets do
+                    use command = new SqlCommand(query, connection, transaction)
+                    populateRow command parameterSet
+                    let affectedRows = command.ExecuteNonQuery() 
+                    affectedRowsByQuery.Add affectedRows
+            transaction.Commit()
+            
+            Ok (List.ofSeq affectedRowsByQuery)
+        with 
+        | ex -> Error ex
+ 
+    let executeReaderSafe (read: SqlDataReader -> Option<'t>) (props: SqlProps) = 
+        try 
+            if Option.isNone props.SqlQuery then failwith "No query provided to execute"
+            use connection = new SqlConnection(props.ConnectionString)
+            connection.Open()
+            use command = new SqlCommand(Option.get props.SqlQuery, connection)
+            if props.NeedPrepare then command.Prepare()
+            populateCmd command props
+            use reader = command.ExecuteReader()
+            let rows = ResizeArray<'t>()
+            while reader.Read() do 
+                read reader
+                |> Option.iter rows.Add
+            Ok (List.ofSeq rows) 
+        with 
+        | ex -> Error ex
+
+    let executeReaderAsync (read: SqlDataReader -> Option<'t>) (props: SqlProps) : Async<'t list> = 
+        async {
+            if Option.isNone props.SqlQuery then failwith "No query provided to execute"
+            use connection = new SqlConnection(props.ConnectionString)
+            do! Async.AwaitTask (connection.OpenAsync())
+            use command = new SqlCommand(Option.get props.SqlQuery, connection)
+            if props.NeedPrepare then command.Prepare()
+            populateCmd command props
+            use! reader = Async.AwaitTask (command.ExecuteReaderAsync())
+            let rows = ResizeArray<'t>()
+            while reader.Read() do
+                reader 
+                |> read
+                |> Option.iter rows.Add
+            return List.ofSeq rows 
+        }
+
+    let executeReaderSafeAsync (read: SqlDataReader -> Option<'t>) (props: SqlProps) = 
+        async {
+            let! result = Async.Catch (executeReaderAsync read props)
+            match result with 
+            | Choice1Of2 value -> return Ok (value)
+            | Choice2Of2 err -> return Error (err)
+        }
 
     let executeTable (props: SqlProps) : SqlTable =
         if Option.isNone props.SqlQuery then failwith "No query provided to execute"

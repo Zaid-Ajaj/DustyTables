@@ -1,3 +1,6 @@
+#### 1.0.0 - 2019-04-13
+* Add Sql.executeReader and Sql.executeTransaction
+
 #### 0.5.0 - 2019-02-06
 * Add readUniqueIdentifier function
 
