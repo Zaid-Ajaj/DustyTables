@@ -4,20 +4,20 @@ open System.Reflection
 
 [<assembly: AssemblyTitleAttribute("DustyTables")>]
 [<assembly: AssemblyProductAttribute("DustyTables")>]
-[<assembly: AssemblyVersionAttribute("1.0.0")>]
+[<assembly: AssemblyVersionAttribute("1.1.0")>]
 [<assembly: AssemblyMetadataAttribute("ReleaseDate","2019-04-13T00:00:00.0000000")>]
-[<assembly: AssemblyFileVersionAttribute("1.0.0")>]
-[<assembly: AssemblyInformationalVersionAttribute("1.0.0")>]
+[<assembly: AssemblyFileVersionAttribute("1.1.0")>]
+[<assembly: AssemblyInformationalVersionAttribute("1.1.0")>]
 [<assembly: AssemblyMetadataAttribute("ReleaseChannel","release")>]
-[<assembly: AssemblyMetadataAttribute("GitHash","ea50f610619c12edd8f8b28277c34a8a31f6a0c2")>]
+[<assembly: AssemblyMetadataAttribute("GitHash","3d74ae2edf9bec30a7008685efe91c1ea096c6cb")>]
 do ()
 
 module internal AssemblyVersionInformation =
     let [<Literal>] AssemblyTitle = "DustyTables"
     let [<Literal>] AssemblyProduct = "DustyTables"
-    let [<Literal>] AssemblyVersion = "1.0.0"
+    let [<Literal>] AssemblyVersion = "1.1.0"
     let [<Literal>] AssemblyMetadata_ReleaseDate = "2019-04-13T00:00:00.0000000"
-    let [<Literal>] AssemblyFileVersion = "1.0.0"
-    let [<Literal>] AssemblyInformationalVersion = "1.0.0"
+    let [<Literal>] AssemblyFileVersion = "1.1.0"
+    let [<Literal>] AssemblyInformationalVersion = "1.1.0"
     let [<Literal>] AssemblyMetadata_ReleaseChannel = "release"
-    let [<Literal>] AssemblyMetadata_GitHash = "ea50f610619c12edd8f8b28277c34a8a31f6a0c2"
+    let [<Literal>] AssemblyMetadata_GitHash = "3d74ae2edf9bec30a7008685efe91c1ea096c6cb"

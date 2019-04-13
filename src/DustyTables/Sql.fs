@@ -331,13 +331,45 @@ module Sql =
         use transaction = connection.BeginTransaction()
         let affectedRowsByQuery = ResizeArray<int>()
         for (query, parameterSets) in queries do
-            for parameterSet in parameterSets do
+            if List.isEmpty parameterSets
+            then 
                 use command = new SqlCommand(query, connection, transaction)
-                populateRow command parameterSet
                 let affectedRows = command.ExecuteNonQuery() 
                 affectedRowsByQuery.Add affectedRows
+            else
+              for parameterSet in parameterSets do
+                  use command = new SqlCommand(query, connection, transaction)
+                  populateRow command parameterSet
+                  let affectedRows = command.ExecuteNonQuery() 
+                  affectedRowsByQuery.Add affectedRows
         transaction.Commit()
         List.ofSeq affectedRowsByQuery
+
+    let executeTransactionAsync queries (props: SqlProps)  = 
+        async {
+            if List.isEmpty queries  
+            then return [ ]
+            else 
+            use connection = new SqlConnection(props.ConnectionString)
+            do! Async.AwaitTask (connection.OpenAsync())
+            use transaction = connection.BeginTransaction()
+            let affectedRowsByQuery = ResizeArray<int>()
+            for (query, parameterSets) in queries do
+                if List.isEmpty parameterSets
+                then 
+                    use command = new SqlCommand(query, connection, transaction)
+                    let! affectedRows = Async.AwaitTask(command.ExecuteNonQueryAsync())
+                    affectedRowsByQuery.Add affectedRows
+                else
+                  for parameterSet in parameterSets do
+                      use command = new SqlCommand(query, connection, transaction)
+                      populateRow command parameterSet
+                      let! affectedRows = Async.AwaitTask(command.ExecuteNonQueryAsync())
+                      affectedRowsByQuery.Add affectedRows
+            transaction.Commit()
+            return List.ofSeq affectedRowsByQuery
+        }
+
 
     let executeTransactionSafe queries (props: SqlProps) = 
         try 
@@ -349,13 +381,18 @@ module Sql =
             use transaction = connection.BeginTransaction()
             let affectedRowsByQuery = ResizeArray<int>()
             for (query, parameterSets) in queries do
-                for parameterSet in parameterSets do
+                if List.isEmpty parameterSets
+                then 
                     use command = new SqlCommand(query, connection, transaction)
-                    populateRow command parameterSet
                     let affectedRows = command.ExecuteNonQuery() 
                     affectedRowsByQuery.Add affectedRows
+                else
+                    for parameterSet in parameterSets do
+                        use command = new SqlCommand(query, connection, transaction)
+                        populateRow command parameterSet
+                        let affectedRows = command.ExecuteNonQuery() 
+                        affectedRowsByQuery.Add affectedRows
             transaction.Commit()
-            
             Ok (List.ofSeq affectedRowsByQuery)
         with 
         | ex -> Error ex

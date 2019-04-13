@@ -1,3 +1,6 @@
+#### 1.1.0 - 2019-04-13
+* Add Sql.executeTransactionAsync and account for parameterless transaction
+
 #### 1.0.0 - 2019-04-13
 * Add Sql.executeReader and Sql.executeTransaction
 
