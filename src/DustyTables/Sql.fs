@@ -397,6 +397,63 @@ module Sql =
         with 
         | ex -> Error ex
  
+    let executeTransactionTask queries (props: SqlProps)  =
+        task {
+            if List.isEmpty queries
+            then return [ ]
+            else
+            use connection = new SqlConnection(props.ConnectionString)
+            do! connection.OpenAsync()
+            use transaction = connection.BeginTransaction()
+            let affectedRowsByQuery = ResizeArray<int>()
+            for (query, parameterSets) in queries do
+                if List.isEmpty parameterSets
+                then
+                    use command = new SqlCommand(query, connection, transaction)
+                    let! affectedRows = command.ExecuteNonQueryAsync()
+                    affectedRowsByQuery.Add affectedRows
+                else
+                  for parameterSet in parameterSets do
+                      use command = new SqlCommand(query, connection, transaction)
+                      populateRow command parameterSet
+                      let! affectedRows = command.ExecuteNonQueryAsync()
+                      affectedRowsByQuery.Add affectedRows
+            transaction.Commit()
+            return List.ofSeq affectedRowsByQuery
+        }
+
+    let executeTransactionSafeTask queries (props: SqlProps)  =
+        task {
+            try
+                if List.isEmpty queries
+                then return Ok [ ]
+                else
+                use connection = new SqlConnection(props.ConnectionString)
+                do! connection.OpenAsync()
+                use transaction = connection.BeginTransaction()
+                let affectedRowsByQuery = ResizeArray<int>()
+                for (query, parameterSets) in queries do
+                    if List.isEmpty parameterSets
+                    then
+                        use command = new SqlCommand(query, connection, transaction)
+                        let! affectedRows = command.ExecuteNonQueryAsync()
+                        affectedRowsByQuery.Add affectedRows
+                    else
+                      for parameterSet in parameterSets do
+                          use command = new SqlCommand(query, connection, transaction)
+                          populateRow command parameterSet
+                          let! affectedRows = command.ExecuteNonQueryAsync()
+                          affectedRowsByQuery.Add affectedRows
+                transaction.Commit()
+                return Ok (List.ofSeq affectedRowsByQuery)
+            with
+            | ex -> return Error ex
+        }
+
+    let executeTransactionSafeAsync queries (props: SqlProps)  =
+        executeTransactionSafeTask queries props
+        |> Async.AwaitTask
+
     let executeReaderSafe (read: SqlDataReader -> Option<'t>) (props: SqlProps) = 
         try 
             if Option.isNone props.SqlQuery then failwith "No query provided to execute"
