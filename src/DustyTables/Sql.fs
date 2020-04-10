@@ -3,6 +3,7 @@ namespace DustyTables
 open System
 open System.Threading.Tasks
 open System.Data
+open Microsoft.Data.SqlClient
 
 [<RequireQualifiedAccess>]
 type SqlValue =
@@ -27,7 +28,7 @@ type SqlTable = list<SqlRow>
 [<RequireQualifiedAccess>]
 module Sql =
     open System.Data.SqlClient
-    open FSharp.Control.Tasks
+    open FSharp.Control.Tasks.V2.ContextInsensitive
 
     type SqlProps = private {
         ConnectionString : string
