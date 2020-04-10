@@ -13,7 +13,7 @@ nuget Microsoft.NET.Test.Sdk 15.7.2
 nuget altcover 4.0.603
 
 nuget TaskBuilder.fs
-nuget System.Data.SqlClient
+nuget Microsoft.Data.SqlClient
 // [ FAKE GROUP ]
 group Build
 
