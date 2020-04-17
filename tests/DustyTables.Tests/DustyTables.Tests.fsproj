@@ -2,17 +2,17 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <OutputType>Exe</OutputType>
-        <TargetFrameworks>netcoreapp2.1;netcoreapp2.0;net461</TargetFrameworks>
+        <TargetFramework>netcoreapp3.1</TargetFramework>
     </PropertyGroup>
     <ItemGroup>
-        <Compile Include="AssemblyInfo.fs" />
         <Compile Include="Tests.fs" />
         <Compile Include="Main.fs" />
     </ItemGroup>
     <ItemGroup>
         <ProjectReference Include="../../src/DustyTables/DustyTables.fsproj" />
     </ItemGroup>
-    <Import Project="..\..\fsc.props" />
-    <Import Project="..\..\netfx.props" />
-    <Import Project="..\..\.paket\Paket.Restore.targets" />
+    <ItemGroup>
+        <PackageReference Include="Expecto" Version="9.0.0" />
+        <PackageReference Include="ThrowawayDb" Version="1.1.0" />
+    </ItemGroup>
 </Project>

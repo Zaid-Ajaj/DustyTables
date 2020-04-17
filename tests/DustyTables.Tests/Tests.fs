@@ -4,17 +4,25 @@ open System
 open Expecto
 open DustyTables
 open DustyTables.OptionWorkflow
-
-let dustyTablesDb = Environment.GetEnvironmentVariable("DUSTY_TABLES_DB", EnvironmentVariableTarget.User)
-if isNull dustyTablesDb then failwith "Missing required environment variable DUSTY_TABLE_DB that points to database"
+open ThrowawayDb
 
 let pass() = Expect.isTrue true "true is true :)"
 let fail() = Expect.isTrue false "true is false :("
 
+let testDatabase testName f =
+    testCase testName <| fun _ ->
+        use db = ThrowawayDatabase.FromLocalInstance("localhost\\SQLEXPRESS")
+        f db.ConnectionString
+
+let ftestDatabase testName f =
+    ftestCase testName <| fun _ ->
+        use db = ThrowawayDatabase.FromLocalInstance("localhost\\SQLEXPRESS")
+        f db.ConnectionString
+
 [<Tests>]
 let tests = testList "DustyTables" [
 
-    testCase "Reading a simple query" <| fun _ ->
+    testDatabase "Reading a simple query" <| fun dustyTablesDb ->
         dustyTablesDb
         |> Sql.connect
         |> Sql.query "select * from (values (1, N'john')) as users(id, username)"
@@ -27,9 +35,9 @@ let tests = testList "DustyTables" [
             })
         |> function
            | [ (1, "john") ] -> pass()
-           | otherwise -> fail() 
+           | otherwise -> fail()
 
-    testCase "Reading a simple query using reader" <| fun _ ->
+    testDatabase "Reading a simple query using reader" <| fun dustyTablesDb ->
         dustyTablesDb
         |> Sql.connect
         |> Sql.query "select * from (values (1, N'john')) as users(id, username)"
@@ -42,9 +50,9 @@ let tests = testList "DustyTables" [
             })
         |> function
            | [ (1, "john") ] -> pass()
-           | otherwise -> fail() 
+           | otherwise -> fail()
 
-    testCase "Reading a parameterized query" <| fun _ ->
+    testDatabase "Reading a parameterized query" <| fun dustyTablesDb ->
         dustyTablesDb
         |> Sql.connect
         |> Sql.query "select * from (values (@userId, @username)) as users(id, username)"
@@ -58,28 +66,28 @@ let tests = testList "DustyTables" [
             })
         |> function
            | [ (5, "jane") ] -> pass()
-           | otherwise -> fail() 
+           | otherwise -> fail()
 
-    testCase "Reading a scalar query" <| fun _ ->
+    testDatabase "Reading a scalar query" <| fun dustyTablesDb ->
         dustyTablesDb
         |> Sql.connect
         |> Sql.query "select 1 as id"
         |> Sql.executeScalar
-        |> Sql.toInt 
-        |> function 
+        |> Sql.toInt
+        |> function
            | 1 -> pass()
            | n -> fail()
 
-    testCase "Reading date time as scalar" <| fun _ ->
+    testDatabase "Reading date time as scalar" <| fun dustyTablesDb ->
         dustyTablesDb
         |> Sql.connect
         |> Sql.query "select getdate()"
-        |> Sql.executeScalar 
-        |> function 
+        |> Sql.executeScalar
+        |> function
            | SqlValue.DateTime time -> pass()
            | otherwise -> fail()
 
-    testCase "Sql.executeScalarSafe catches exceptions" <| fun _ ->
+    testDatabase "Sql.executeScalarSafe catches exceptions" <| fun dustyTablesDb ->
         dustyTablesDb
         |> Sql.connect
         |> Sql.query "select some invalid SQL"
@@ -88,22 +96,22 @@ let tests = testList "DustyTables" [
            | Error ex -> pass()
            | Ok _ -> fail()
 
-    testCase "NULL values are skipped when using option workflow" <| fun _ ->
+    testDatabase "NULL values are skipped when using option workflow" <| fun dustyTablesDb ->
         dustyTablesDb
         |> Sql.connect
         |> Sql.query "select * from (values (1, NULL), (2, N'john')) as users(id, username)"
         |> Sql.executeTable
-        |> Sql.mapEachRow (fun row -> 
+        |> Sql.mapEachRow (fun row ->
             option {
               let! id = Sql.readInt "id" row
               let! username = Sql.readString "username" row
               return (id, username)
             })
-        |> function 
+        |> function
            | [ (2, "john") ] -> pass()
            | otherwise -> fail()
 
-    testCase "Executing stored procedure" <| fun _ ->
+    testDatabase "Executing stored procedure" <| fun dustyTablesDb ->
         dustyTablesDb
         |> Sql.connect
         |> Sql.storedProcedure "sp_executesql"
@@ -113,7 +121,7 @@ let tests = testList "DustyTables" [
            | SqlValue.Int 42 -> pass()
            | otherwise -> fail()
 
-    testCase "Executing parameterized function in query" <| fun _ ->
+    testDatabase "Executing parameterized function in query" <| fun dustyTablesDb ->
         dustyTablesDb
         |> Sql.connect
         |> Sql.query "SELECT LOWER(@inputText)"
@@ -123,7 +131,7 @@ let tests = testList "DustyTables" [
            | SqlValue.String "text" -> pass()
            | otherwise -> fail()
 
-    testCase "Reading different number formats" <| fun _ ->
+    testDatabase "Reading different number formats" <| fun dustyTablesDb ->
         dustyTablesDb
         |> Sql.connect
         |> Sql.queryStatements [
@@ -147,7 +155,7 @@ let tests = testList "DustyTables" [
            | otherwise ->
               fail()
 
-    testCase "number formats roundtrip" <| fun _ ->
+    testDatabase "number formats roundtrip" <| fun dustyTablesDb ->
         dustyTablesDb
         |> Sql.connect
         |> Sql.query "select * from (values(@xs, @s, @l)) as numbers(xs, s, l)"
@@ -171,7 +179,7 @@ let tests = testList "DustyTables" [
            | otherwise ->
               fail()
 
-    testCase "binary roundtrip" <| fun _ ->
+    testDatabase "binary roundtrip" <| fun dustyTablesDb ->
         dustyTablesDb
         |> Sql.connect
         |> Sql.query "select @blob"
@@ -181,7 +189,7 @@ let tests = testList "DustyTables" [
            | SqlValue.Binary bytes -> Expect.equal bytes [| byte 1; byte 2; byte 3 |] "bytes are the same"
            | otherwise -> fail()
 
-    testCase "reading unique identifier works" <| fun _ ->
+    testDatabase "reading unique identifier works" <| fun dustyTablesDb ->
         dustyTablesDb
         |> Sql.connect
         |> Sql.query "select newid()"
@@ -190,7 +198,7 @@ let tests = testList "DustyTables" [
               | SqlValue.UniqueIdentifier value -> pass()
               | otherwise -> fail()
 
-    testCase "unique identifier roundtrip" <| fun _ ->
+    testDatabase "unique identifier roundtrip" <| fun dustyTablesDb ->
         let original = Guid.NewGuid()
         dustyTablesDb
         |> Sql.connect
@@ -201,7 +209,7 @@ let tests = testList "DustyTables" [
               | SqlValue.UniqueIdentifier roundtripped -> Expect.equal original roundtripped "Roundtrip works"
               | otherwise -> fail()
 
-    testCase "reading money as decimal" <| fun _ ->
+    testDatabase "reading money as decimal" <| fun dustyTablesDb ->
         dustyTablesDb
         |> Sql.connect
         |> Sql.query "select cast(1.2345 as money)"
@@ -209,7 +217,7 @@ let tests = testList "DustyTables" [
         |> Sql.toDecimal
         |> fun value -> Expect.equal value 1.2345M "decimal is correct"
 
-    testCase "Simpy reading a single column from table" <| fun _ ->
+    testDatabase "Simpy reading a single column from table" <| fun dustyTablesDb ->
         dustyTablesDb
         |> Sql.connect
         |> Sql.query "select name from (values(N'one'), (N'two'), (N'three')) as numbers(name)"
@@ -219,7 +227,7 @@ let tests = testList "DustyTables" [
            | [ "one"; "two"; "three" ] -> pass()
            | otherwise -> fail()
 
-    testCase "reading count as integer" <| fun _ ->
+    testDatabase "reading count as integer" <| fun dustyTablesDb ->
         dustyTablesDb
         |> Sql.connect
         |> Sql.query "select count(*) from (values(1, 2)) as numbers(one, two)"
@@ -229,7 +237,7 @@ let tests = testList "DustyTables" [
             | 1 -> pass()
             | _ -> fail()
 
-    testCase "decimal roundtrip" <| fun _ ->
+    testDatabase "decimal roundtrip" <| fun dustyTablesDb ->
         dustyTablesDb
         |> Sql.connect
         |> Sql.query "select @value"
@@ -237,4 +245,4 @@ let tests = testList "DustyTables" [
         |> Sql.executeScalar
         |> Sql.toDecimal
         |> fun value -> Expect.equal value 1.234567M "decimal is correct"
-  ] 
+  ]

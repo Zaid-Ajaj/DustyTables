@@ -27,7 +27,6 @@ type SqlTable = list<SqlRow>
 
 [<RequireQualifiedAccess>]
 module Sql =
-    open System.Data.SqlClient
     open FSharp.Control.Tasks.V2.ContextInsensitive
 
     type SqlProps = private {
@@ -65,15 +64,15 @@ module Sql =
         | SqlValue.TinyInt x -> x
         | value -> failwithf "Could not convert %A into a tinyint" value
 
-    let toSmallint = function 
-        | SqlValue.Smallint x -> x 
-        | value -> failwithf "Could not convert %A into a short (int16)" value 
-        
+    let toSmallint = function
+        | SqlValue.Smallint x -> x
+        | value -> failwithf "Could not convert %A into a short (int16)" value
+
     let toInt = function
         | SqlValue.Int x -> x
         | value -> failwithf "Could not convert %A into an integer" value
 
-    let toBigint = function 
+    let toBigint = function
         | SqlValue.Bigint x -> x
         | value -> failwithf "Could not convert %A into long (int64)" value
 
@@ -85,14 +84,14 @@ module Sql =
         | SqlValue.DateTime x -> x
         | value -> failwithf "Could not convert %A into a DateTime" value
 
-    let toDateTimeOffset = function 
+    let toDateTimeOffset = function
         | SqlValue.DateTimeOffset x -> x
         | value -> failwithf "Could not convert %A into a DateTimeOffset" value
 
     let toFloat = function
         | SqlValue.Float x -> x
         | value -> failwithf "Could not convert %A into a floating number" value
-        
+
     let toBinary = function
         | SqlValue.Binary bytes -> bytes
         | value -> failwithf "Could not convert %A into binary (i.e. byte[]) value" value
@@ -101,31 +100,31 @@ module Sql =
         | SqlValue.Decimal value -> value
         | value -> failwithf "Could not convert %A into decimal value" value
 
-    let toUniqueIdentifier = function 
+    let toUniqueIdentifier = function
         | SqlValue.UniqueIdentifier guid -> guid
         | value ->  failwithf "Could not convert %A into Guid value" value
- 
+
     let readValue value =
         let valueType = value.GetType()
-        if isNull value 
+        if isNull value
         then SqlValue.Null
-        elif valueType = typeof<uint8> 
+        elif valueType = typeof<uint8>
         then SqlValue.TinyInt (unbox<uint8> value)
-        elif valueType = typeof<int16> 
+        elif valueType = typeof<int16>
         then SqlValue.Smallint (unbox<int16> value)
         elif valueType = typeof<int32>
         then SqlValue.Int (unbox<int32> value)
-        elif valueType = typeof<int64> 
+        elif valueType = typeof<int64>
         then SqlValue.Bigint (unbox<int64> value)
         elif valueType = typeof<bool>
         then SqlValue.Bool (unbox<bool> value)
-        elif valueType = typeof<float> 
+        elif valueType = typeof<float>
         then SqlValue.Float (unbox<float> value)
         elif valueType = typeof<decimal>
         then SqlValue.Decimal (unbox<decimal> value)
-        elif valueType = typeof<DateTime> 
+        elif valueType = typeof<DateTime>
         then SqlValue.DateTime (unbox<DateTime> value)
-        elif valueType = typeof<DateTimeOffset> 
+        elif valueType = typeof<DateTimeOffset>
         then SqlValue.DateTimeOffset (unbox<DateTimeOffset> value)
         elif valueType = typeof<byte[]>
         then SqlValue.Binary (unbox<byte[]> value)
@@ -134,20 +133,20 @@ module Sql =
         elif valueType = typeof<Guid>
         then SqlValue.UniqueIdentifier (unbox<Guid> value)
         else failwithf "Could not convert value of type '%s' to SqlValue" (valueType.FullName)
- 
-    let readTinyInt name (row: SqlRow) = 
+
+    let readTinyInt name (row: SqlRow) =
         row
         |> List.tryFind (fun (colName, value) -> colName = name)
-        |> Option.map snd 
-        |> function 
+        |> Option.map snd
+        |> function
             | Some (SqlValue.TinyInt value) -> Some value
-            | _ -> None       
-  
-    let readSmallInt name (row: SqlRow) = 
+            | _ -> None
+
+    let readSmallInt name (row: SqlRow) =
         row
         |> List.tryFind (fun (colName, value) -> colName = name)
-        |> Option.map snd 
-        |> function 
+        |> Option.map snd
+        |> function
             | Some (SqlValue.Smallint value) -> Some value
             | _ -> None
 
@@ -207,19 +206,19 @@ module Sql =
             | Some (SqlValue.Float value) -> Some value
             | _ -> None
 
-    let readDateTimeOffset name (row: SqlRow) = 
-        row 
-        |> List.tryFind (fun (colName, value) -> colName = name)
-        |> Option.map snd 
-        |> function 
-            | Some (SqlValue.DateTimeOffset value) -> Some value 
-            | _ -> None
-
-    let readUniqueIdentifier name (row: SqlRow) = 
-        row 
+    let readDateTimeOffset name (row: SqlRow) =
+        row
         |> List.tryFind (fun (colName, value) -> colName = name)
         |> Option.map snd
-        |> function 
+        |> function
+            | Some (SqlValue.DateTimeOffset value) -> Some value
+            | _ -> None
+
+    let readUniqueIdentifier name (row: SqlRow) =
+        row
+        |> List.tryFind (fun (colName, value) -> colName = name)
+        |> Option.map snd
+        |> function
             | Some (SqlValue.UniqueIdentifier value) -> Some value
             | _ -> None
 
@@ -273,7 +272,7 @@ module Sql =
         readTableTask reader
         |> Async.AwaitTask
 
-    let populateRow (cmd: SqlCommand) (row: SqlRow) = 
+    let populateRow (cmd: SqlCommand) (row: SqlRow) =
         for param in row do
             let paramValue : obj =
                 match snd param with
@@ -292,23 +291,23 @@ module Sql =
                 | SqlValue.DateTimeOffset x -> upcast x
 
             // prepend param name with @ if it doesn't already
-            let paramName = 
+            let paramName =
                 if (fst param).StartsWith("@")
-                then fst param  
+                then fst param
                 else sprintf "@%s" (fst param)
 
             cmd.Parameters.AddWithValue(paramName, paramValue) |> ignore
 
     let private populateCmd (cmd: SqlCommand) (props: SqlProps) =
         if props.IsFunction then cmd.CommandType <- CommandType.StoredProcedure
-        
-        match props.Timeout with 
-        | Some timeout -> cmd.CommandTimeout <- timeout 
-        | None -> () 
+
+        match props.Timeout with
+        | Some timeout -> cmd.CommandTimeout <- timeout
+        | None -> ()
 
         populateRow cmd props.Parameters
 
-    let executeReader (read: SqlDataReader -> Option<'t>) (props: SqlProps) : 't list = 
+    let executeReader (read: SqlDataReader -> Option<'t>) (props: SqlProps) : 't list =
         if Option.isNone props.SqlQuery then failwith "No query provided to execute"
         use connection = new SqlConnection(props.ConnectionString)
         connection.Open()
@@ -318,46 +317,46 @@ module Sql =
         use reader = command.ExecuteReader()
         let rows = ResizeArray<'t>()
         while reader.Read() do
-            reader 
+            reader
             |> read
             |> Option.iter rows.Add
-        List.ofSeq rows 
+        List.ofSeq rows
 
-    let executeTransaction queries (props: SqlProps)  = 
-        if List.isEmpty queries  
+    let executeTransaction queries (props: SqlProps)  =
+        if List.isEmpty queries
         then [ ]
-        else 
+        else
         use connection = new SqlConnection(props.ConnectionString)
         connection.Open()
         use transaction = connection.BeginTransaction()
         let affectedRowsByQuery = ResizeArray<int>()
         for (query, parameterSets) in queries do
             if List.isEmpty parameterSets
-            then 
+            then
                 use command = new SqlCommand(query, connection, transaction)
-                let affectedRows = command.ExecuteNonQuery() 
+                let affectedRows = command.ExecuteNonQuery()
                 affectedRowsByQuery.Add affectedRows
             else
               for parameterSet in parameterSets do
                   use command = new SqlCommand(query, connection, transaction)
                   populateRow command parameterSet
-                  let affectedRows = command.ExecuteNonQuery() 
+                  let affectedRows = command.ExecuteNonQuery()
                   affectedRowsByQuery.Add affectedRows
         transaction.Commit()
         List.ofSeq affectedRowsByQuery
 
-    let executeTransactionAsync queries (props: SqlProps)  = 
+    let executeTransactionAsync queries (props: SqlProps)  =
         async {
-            if List.isEmpty queries  
+            if List.isEmpty queries
             then return [ ]
-            else 
+            else
             use connection = new SqlConnection(props.ConnectionString)
             do! Async.AwaitTask (connection.OpenAsync())
             use transaction = connection.BeginTransaction()
             let affectedRowsByQuery = ResizeArray<int>()
             for (query, parameterSets) in queries do
                 if List.isEmpty parameterSets
-                then 
+                then
                     use command = new SqlCommand(query, connection, transaction)
                     let! affectedRows = Async.AwaitTask(command.ExecuteNonQueryAsync())
                     affectedRowsByQuery.Add affectedRows
@@ -372,32 +371,32 @@ module Sql =
         }
 
 
-    let executeTransactionSafe queries (props: SqlProps) = 
-        try 
-            if List.isEmpty queries  
+    let executeTransactionSafe queries (props: SqlProps) =
+        try
+            if List.isEmpty queries
             then Ok [ ]
-            else 
+            else
             use connection = new SqlConnection(props.ConnectionString)
             connection.Open()
             use transaction = connection.BeginTransaction()
             let affectedRowsByQuery = ResizeArray<int>()
             for (query, parameterSets) in queries do
                 if List.isEmpty parameterSets
-                then 
+                then
                     use command = new SqlCommand(query, connection, transaction)
-                    let affectedRows = command.ExecuteNonQuery() 
+                    let affectedRows = command.ExecuteNonQuery()
                     affectedRowsByQuery.Add affectedRows
                 else
                     for parameterSet in parameterSets do
                         use command = new SqlCommand(query, connection, transaction)
                         populateRow command parameterSet
-                        let affectedRows = command.ExecuteNonQuery() 
+                        let affectedRows = command.ExecuteNonQuery()
                         affectedRowsByQuery.Add affectedRows
             transaction.Commit()
             Ok (List.ofSeq affectedRowsByQuery)
-        with 
+        with
         | ex -> Error ex
- 
+
     let executeTransactionTask queries (props: SqlProps)  =
         task {
             if List.isEmpty queries
@@ -455,8 +454,8 @@ module Sql =
         executeTransactionSafeTask queries props
         |> Async.AwaitTask
 
-    let executeReaderSafe (read: SqlDataReader -> Option<'t>) (props: SqlProps) = 
-        try 
+    let executeReaderSafe (read: SqlDataReader -> Option<'t>) (props: SqlProps) =
+        try
             if Option.isNone props.SqlQuery then failwith "No query provided to execute"
             use connection = new SqlConnection(props.ConnectionString)
             connection.Open()
@@ -465,14 +464,14 @@ module Sql =
             populateCmd command props
             use reader = command.ExecuteReader()
             let rows = ResizeArray<'t>()
-            while reader.Read() do 
+            while reader.Read() do
                 read reader
                 |> Option.iter rows.Add
-            Ok (List.ofSeq rows) 
-        with 
+            Ok (List.ofSeq rows)
+        with
         | ex -> Error ex
 
-    let executeReaderAsync (read: SqlDataReader -> Option<'t>) (props: SqlProps) : Async<'t list> = 
+    let executeReaderAsync (read: SqlDataReader -> Option<'t>) (props: SqlProps) : Async<'t list> =
         async {
             if Option.isNone props.SqlQuery then failwith "No query provided to execute"
             use connection = new SqlConnection(props.ConnectionString)
@@ -483,16 +482,16 @@ module Sql =
             use! reader = Async.AwaitTask (command.ExecuteReaderAsync())
             let rows = ResizeArray<'t>()
             while reader.Read() do
-                reader 
+                reader
                 |> read
                 |> Option.iter rows.Add
-            return List.ofSeq rows 
+            return List.ofSeq rows
         }
 
-    let executeReaderSafeAsync (read: SqlDataReader -> Option<'t>) (props: SqlProps) = 
+    let executeReaderSafeAsync (read: SqlDataReader -> Option<'t>) (props: SqlProps) =
         async {
             let! result = Async.Catch (executeReaderAsync read props)
-            match result with 
+            match result with
             | Choice1Of2 value -> return Ok (value)
             | Choice2Of2 err -> return Error (err)
         }
@@ -537,7 +536,7 @@ module Sql =
                 if props.NeedPrepare then command.Prepare()
                 do populateCmd command props
                 use! reader = command.ExecuteReaderAsync()
-                let! result = readTableTask reader 
+                let! result = readTableTask reader
                 return Ok (result)
             with
             | ex -> return Error ex
@@ -567,7 +566,7 @@ module Sql =
         if props.NeedPrepare then command.Prepare()
         populateCmd command props
         command.ExecuteNonQuery()
- 
+
     let executeNonQuerySafe (props: SqlProps) : Result<int, exn> =
         try Ok (executeNonQuery props)
         with | ex -> Error ex

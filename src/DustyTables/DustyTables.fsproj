@@ -1,33 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <TargetFrameworks>netstandard2.0;net461</TargetFrameworks>
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
-  </PropertyGroup>
-  <PropertyGroup>
-    <Title>DustyTables</Title>
-    <Description>Thin F# API for SqlClient for easy data access to ms sql server with functional seasoning on top</Description>
-    <!-- summary is not migrated from project.json, but you can use the <Description> property for that if needed. -->
-    <PackageTags>f#, fsharp</PackageTags>
-    <PackageProjectUrl>https://github.com/zaid-ajaj/DustyTables</PackageProjectUrl>
-    <PackageLicenseUrl>https://github.com/zaid-ajaj/DustyTables/blob/master/LICENSE.md</PackageLicenseUrl>
-    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
-    <RepositoryType>git</RepositoryType>
-    <Authors>zaid-ajaj</Authors>
-    <RepositoryUrl>https://github.com/zaid-ajaj/DustyTables</RepositoryUrl>
-    <!-- owners is not supported in MSBuild -->
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)'=='Release'">
-    <Optimize>true</Optimize>
-    <Tailcalls>true</Tailcalls>
-    
-  </PropertyGroup>
-  <ItemGroup>
-    <Compile Include="AssemblyInfo.fs" />
-    <Compile Include="Sql.fs" />
-    <Compile Include="OptionWorkflow.fs" />
-  </ItemGroup>
-  <Import Project="..\..\fsc.props" />
-  <Import Project="..\..\netfx.props" />
-  <Import Project="..\..\.paket\Paket.Restore.targets" />
+    <PropertyGroup>
+        <TargetFrameworks>netstandard2.0</TargetFrameworks>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    </PropertyGroup>
+    <PropertyGroup>
+        <Title>DustyTables</Title>
+        <Description>Thin F# API for SqlClient for easy data access to ms sql server with functional seasoning on top</Description>
+        <!-- summary is not migrated from project.json, but you can use the <Description> property for that if needed. -->
+        <PackageTags>f#, fsharp</PackageTags>
+        <PackageProjectUrl>https://github.com/zaid-ajaj/DustyTables</PackageProjectUrl>
+        <PackageLicenseUrl>https://github.com/zaid-ajaj/DustyTables/blob/master/LICENSE.md</PackageLicenseUrl>
+        <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+        <RepositoryType>git</RepositoryType>
+        <Authors>zaid-ajaj</Authors>
+        <RepositoryUrl>https://github.com/zaid-ajaj/DustyTables</RepositoryUrl>
+        <Version>1.2.0</Version>
+        <PackageReleaseNotes>Use Microsoft.Data.SqlClient</PackageReleaseNotes>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Configuration)'=='Release'">
+        <Optimize>true</Optimize>
+        <Tailcalls>true</Tailcalls>
+    </PropertyGroup>
+    <ItemGroup>
+        <Compile Include="Sql.fs" />
+        <Compile Include="OptionWorkflow.fs" />
+    </ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Data.SqlClient" Version="1.1.2" />
+        <PackageReference Include="TaskBuilder.fs" Version="2.1.0" />
+    </ItemGroup>
 </Project>
