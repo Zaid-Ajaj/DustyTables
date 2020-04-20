@@ -1,6 +1,7 @@
 module Tests
 
 open System
+open System.Data
 open Expecto
 open DustyTables
 open DustyTables.OptionWorkflow
@@ -245,4 +246,58 @@ let tests = testList "DustyTables" [
         |> Sql.executeScalar
         |> Sql.toDecimal
         |> fun value -> Expect.equal value 1.234567M "decimal is correct"
+
+    testDatabase "table-valued parameters in a stored procedure" <| fun dustyTablesDb ->
+        // create a custom SQL type
+        dustyTablesDb
+        |> Sql.connect
+        |> Sql.query "create type CustomPeopleTableType as table (firstName nvarchar(max), lastName nvarchar(max))"
+        |> Sql.executeNonQuery
+        |> ignore
+
+        // create a stored procedure to use the custom SQL type
+        dustyTablesDb
+        |> Sql.connect
+        |> Sql.query """
+            create proc sp_TableValuedParametersTest
+                (@people CustomPeopleTableType READONLY)
+            as
+            begin
+                select firstName, lastName from @people
+            end
+        """
+        |> Sql.executeNonQuery
+        |> ignore
+
+        // create a new table-valued parameter
+        let people : SqlValue =
+            let customTypeName = "CustomPeopleTableType"
+            let table = new DataTable()
+            table.Columns.Add "firstName" |> ignore
+            table.Columns.Add "lastName"  |> ignore
+            table.Rows.Add("John", "Doe") |> ignore
+            table.Rows.Add("Jane", "Doe") |> ignore
+            table.Rows.Add("Fred", "Doe") |> ignore
+            SqlValue.Table (customTypeName, table)
+
+        // query the procedure
+        dustyTablesDb
+        |> Sql.connect
+        |> Sql.storedProcedure "sp_TableValuedParametersTest"
+        |> Sql.parameters ["@people", people]
+        |> Sql.executeTable
+        |> Sql.mapEachRow (fun row ->
+              option {
+                  let! firstName = Sql.readString "firstName" row
+                  let! lastName = Sql.readString "lastName" row
+
+                  return sprintf "%s %s" firstName lastName
+              })
+        |> function
+           [ first; second; third ] ->
+              Expect.equal first "John Doe" "First name is John Doe"
+              Expect.equal second "Jane Doe" "Second name is Jane Doe"
+              Expect.equal third "Fred Doe" "Third name is Fred Doe"
+           | otherwise ->
+              fail()
   ]
