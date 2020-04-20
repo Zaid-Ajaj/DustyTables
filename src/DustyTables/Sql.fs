@@ -19,6 +19,7 @@ type SqlValue =
     | Decimal of decimal
     | Binary of byte[]
     | UniqueIdentifier of Guid
+    | Table of string * DataTable
     | Null
 
 type SqlRow = list<string * SqlValue>
@@ -289,6 +290,7 @@ module Sql =
                 | SqlValue.Binary bytes -> upcast bytes
                 | SqlValue.UniqueIdentifier guid -> upcast guid
                 | SqlValue.DateTimeOffset x -> upcast x
+                | SqlValue.Table (_, x) -> upcast x
 
             // prepend param name with @ if it doesn't already
             let paramName =
@@ -296,7 +298,15 @@ module Sql =
                 then fst param
                 else sprintf "@%s" (fst param)
 
-            cmd.Parameters.AddWithValue(paramName, paramValue) |> ignore
+            match snd param with
+            | SqlValue.Table (typeName, _) ->
+                let tableParam = cmd.Parameters.AddWithValue(paramName, paramValue)
+                // TypeName must be set to the custom SQL tvp type
+                tableParam.TypeName <- typeName
+                // SqlDbType must be set to Structured for a table-valued parameter
+                tableParam.SqlDbType <- SqlDbType.Structured
+            | _ ->
+                cmd.Parameters.AddWithValue(paramName, paramValue) |> ignore
 
     let private populateCmd (cmd: SqlCommand) (props: SqlProps) =
         if props.IsFunction then cmd.CommandType <- CommandType.StoredProcedure
