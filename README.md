@@ -165,6 +165,33 @@ let userExists (username: string) : Async<bool> =
         return Sql.toBool userExists 
     }
 ```
+### Executing a stored procedure with table-valued parameters
+```fs
+open DustyTables
+open System.Data
+
+// get the connection from the environment
+let connectionString() = Env.getVar "app_db"
+
+let executeMyStoredProcedure () : Async<int> = 
+    // create a table-valued parameter
+    let customSqlTypeName = "MyCustomSqlTypeName"
+    let dataTable = new DataTable()
+    dataTable.Columns.Add "FirstName" |> ignore
+    dataTable.Columns.Add "LastName"  |> ignore
+    // add rows to the table parameter
+    dataTable.Rows.Add("John", "Doe") |> ignore
+    dataTable.Rows.Add("Jane", "Doe") |> ignore
+    dataTable.Rows.Add("Fred", "Doe") |> ignore
+
+    connectionString()
+    |> Sql.connect
+    |> Sql.storedProcedure "my_stored_proc"
+    |> Sql.parameters 
+        [ "@foo", SqlValue.Int 1 
+          "@people", SqlValue.Table (customSqlTypeName, dataTable) ]
+    |> Sql.executeNonQueryAsync
+```
 
 ## Running Tests locally
 
