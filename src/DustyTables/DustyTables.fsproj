@@ -15,8 +15,8 @@
         <RepositoryType>git</RepositoryType>
         <Authors>zaid-ajaj</Authors>
         <RepositoryUrl>https://github.com/zaid-ajaj/DustyTables</RepositoryUrl>
-        <Version>1.2.0</Version>
-        <PackageReleaseNotes>Use Microsoft.Data.SqlClient</PackageReleaseNotes>
+        <Version>1.3.0</Version>
+        <PackageReleaseNotes>Added support for table valued parameters</PackageReleaseNotes>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Configuration)'=='Release'">
         <Optimize>true</Optimize>
