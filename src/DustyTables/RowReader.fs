@@ -27,11 +27,16 @@ type RowReader(reader: SqlDataReader) =
         failwithf "Could not read column '%s' as %s. Available columns are %s"  column columnType availableColumns
     with
 
-    member this.int(columnIndex: int) : int = reader.GetInt32(columnIndex)
+    member this.int(columnIndex: int) : int =
+        if types.[columnIndex] = "tinyint"
+        then int (reader.GetByte columnIndex)
+        elif types.[columnIndex] = "smallint"
+        then int (reader.GetInt16 columnIndex)
+        else reader.GetInt32 columnIndex
 
     member this.int(column: string) : int =
         match columnDict.TryGetValue(column) with
-        | true, columnIndex -> reader.GetInt32(columnIndex)
+        | true, columnIndex -> this.int columnIndex
         | false, _ -> failToRead column "int"
 
     member this.intOrNone(column: string) : int option =
@@ -39,19 +44,35 @@ type RowReader(reader: SqlDataReader) =
         | true, columnIndex ->
             if reader.IsDBNull(columnIndex)
             then None
-            else Some (reader.GetInt32(columnIndex))
+            else Some (this.int columnIndex)
         | false, _ -> failToRead column "int"
 
     member this.intOrNone(columnIndex: int) =
         if reader.IsDBNull(columnIndex)
         then None
-        else Some (reader.GetInt32(columnIndex))
+        else Some (this.int (columnIndex))
 
-    member this.int16(columnIndex: int) = reader.GetInt16(columnIndex)
+    member this.tinyint(column: string) =
+        match columnDict.TryGetValue(column) with
+        | true, columnIndex -> reader.GetByte(columnIndex)
+        | false, _ -> failToRead column "tinyint"
+
+    member this.tinyintOrNone(column: string) =
+        match columnDict.TryGetValue(column) with
+        | true, columnIndex ->
+            if reader.IsDBNull(columnIndex)
+            then None
+            else Some (reader.GetByte(columnIndex))
+        | false, _ -> failToRead column "tinyint"
+
+    member this.int16(columnIndex: int) =
+        if types.[columnIndex] = "tinyint" 
+        then int16 (reader.GetByte(columnIndex))
+        else reader.GetInt16(columnIndex)
 
     member this.int16(column: string) : int16 =
         match columnDict.TryGetValue(column) with
-        | true, columnIndex -> reader.GetInt16(columnIndex)
+        | true, columnIndex -> this.int16(columnIndex)
         | false, _ -> failToRead column "int16"
 
     member this.int16OrNone(column: string) : int16 option =
@@ -59,36 +80,36 @@ type RowReader(reader: SqlDataReader) =
         | true, columnIndex ->
             if reader.IsDBNull(columnIndex)
             then None
-            else Some (reader.GetInt16(columnIndex))
+            else Some (this.int16(columnIndex))
         | false, _ -> failToRead column "int16"
 
     member this.int16OrNone(columnIndex: int) =
         if reader.IsDBNull(columnIndex)
         then None
-        else Some (reader.GetInt16(columnIndex))
+        else Some (this.int16(columnIndex))
+
+    member this.int64(columnIndex: int) : int64 =
+        if types.[columnIndex] = "tinyint" || types.[columnIndex] = "smallint" || types.[columnIndex] = "int"
+        then Convert.ToInt64(reader.GetValue(columnIndex))
+        else reader.GetInt64(columnIndex)
 
     member this.int64(column: string) : int64 =
         match columnDict.TryGetValue(column) with
-        | true, columnIndex -> reader.GetInt64(columnIndex)
+        | true, columnIndex -> this.int64(columnIndex)
         | false, _ -> failToRead column "int64"
-
-    member this.int64(columnIndex: int) : int64 =
-        if types.[columnIndex] = "int"
-        then Convert.ToInt64(reader.GetValue(columnIndex))
-        else reader.GetInt64(columnIndex)
 
     member this.int64OrNone(column: string) : int64 option =
         match columnDict.TryGetValue(column) with
         | true, columnIndex ->
             if reader.IsDBNull(columnIndex)
             then None
-            else Some (reader.GetInt64(columnIndex))
+            else Some (this.int64 columnIndex)
         | false, _ -> failToRead column "int64"
 
     member this.int64OrNone(columnIndex: int) : int64 option =
         if reader.IsDBNull(columnIndex)
         then None
-        else Some (reader.GetInt64(columnIndex))
+        else Some (this.int64(columnIndex))
 
     member this.string(column: string) : string =
         match columnDict.TryGetValue(column) with

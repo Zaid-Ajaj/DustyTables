@@ -14,8 +14,8 @@
         <RepositoryType>git</RepositoryType>
         <Authors>zaid-ajaj</Authors>
         <RepositoryUrl>https://github.com/zaid-ajaj/DustyTables</RepositoryUrl>
-        <Version>2.0.0</Version>
-        <PackageReleaseNotes>Full rewrite and massive simplification</PackageReleaseNotes>
+        <Version>2.1.0</Version>
+        <PackageReleaseNotes>Flexible integer handling</PackageReleaseNotes>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Configuration)'=='Release'">
         <Optimize>true</Optimize>

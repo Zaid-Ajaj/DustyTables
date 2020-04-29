@@ -190,6 +190,28 @@ let tests = testList "DustyTables" [
             | Error ex -> raise ex
             | otherwise -> fail()
 
+    ftestDatabase "reading tinyint as int" <| fun connectionString ->
+        connectionString
+        |> Sql.connect
+        |> Sql.query "SELECT CAST(@value as tinyint) as output"
+        |> Sql.parameters [ "value", Sql.int 1 ]
+        |> Sql.execute (fun read -> read.int "output")
+        |> function
+            | Ok [ 1 ] -> pass()
+            | Error error -> raise error 
+            | otherwise -> fail()
+
+    ftestDatabase "reading tinyint as int64" <| fun connectionString ->
+        connectionString
+        |> Sql.connect
+        |> Sql.query "SELECT CAST(@value as tinyint) as output"
+        |> Sql.parameters [ "value", Sql.int 1 ]
+        |> Sql.execute (fun read -> read.int64 "output")
+        |> function
+            | Ok [ 1L ] -> pass()
+            | Error error -> raise error 
+            | otherwise -> fail()
+             
     testDatabase "table-valued parameters in a stored procedure" <| fun connectionString ->
         // create a custom SQL type
         connectionString
