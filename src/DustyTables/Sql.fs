@@ -4,39 +4,99 @@ open System
 open System.Threading.Tasks
 open System.Data
 open Microsoft.Data.SqlClient
+open System.Threading
 
-[<RequireQualifiedAccess>]
-type SqlValue =
-    | TinyInt of uint8
-    | Smallint of int16
-    | Int of int
-    | Bigint of int64
-    | String of string
-    | DateTime of DateTime
-    | DateTimeOffset of DateTimeOffset
-    | Bool of bool
-    | Float of double
-    | Decimal of decimal
-    | Binary of byte[]
-    | UniqueIdentifier of Guid
-    | Table of string * DataTable
-    | Null
+type Sql() =
+    static member dbnull = SqlParameter(Value=DBNull.Value)
 
-type SqlRow = list<string * SqlValue>
+    static member int(value: int) = SqlParameter(Value = value, DbType = DbType.Int32)
 
-type SqlTable = list<SqlRow>
+    static member intOrNone(value: int option) =
+        match value with
+        | Some value -> Sql.int(value)
+        | None -> Sql.dbnull
+
+    static member string(value: string) = SqlParameter(Value = value, DbType = DbType.String)
+
+    static member stringOrNone(value: string option) =
+        match value with
+        | Some value -> Sql.string(value)
+        | None -> Sql.dbnull
+
+    static member bool(value: bool) = SqlParameter(Value=value, DbType=DbType.Boolean)
+
+    static member boolOrNone(value: bool option) =
+        match value with
+        | Some thing -> Sql.bool(thing)
+        | None -> Sql.dbnull
+
+    static member double(value: double) = SqlParameter(Value=value, DbType = DbType.Double)
+
+    static member doubleOrNone(value: double option) =
+        match value with
+        | Some value -> Sql.double(value)
+        | None -> SqlParameter(Value=DBNull.Value)
+
+    static member decimal(value: decimal) = SqlParameter(Value=value, DbType = DbType.Decimal)
+
+    static member decimalOrNone(value: decimal option) =
+        match value with
+        | Some value -> Sql.decimal(value)
+        | None -> Sql.dbnull
+
+    static member int16(value: int16) = SqlParameter(Value = value, DbType = DbType.Int16)
+
+    static member int16OrNone(value: int16 option) =
+        match value with
+        | Some value -> Sql.int16 value
+        | None -> Sql.dbnull
+    
+    static member int64(value: int64) = SqlParameter(Value = value, DbType = DbType.Int64)
+
+    static member int64OrNone(value: int64 option) =
+        match value with
+        | Some value -> Sql.int64 value
+        | None -> Sql.dbnull
+
+    static member dateTime(value: DateTime) = SqlParameter(Value=value, DbType = DbType.DateTime)
+
+    static member dateTimeOrNone(value: DateTime option) =
+        match value with
+        | Some value -> Sql.dateTime(value)
+        | None -> Sql.dbnull
+
+    static member uniqueidentifier(value: Guid) = SqlParameter(Value=value, DbType = DbType.Guid)
+
+    static member uniqueidentifierOrNone(value: Guid option) =
+        match value with
+        | Some value -> Sql.uniqueidentifier value
+        | None -> Sql.dbnull
+
+    static member bytes(value: byte[]) = SqlParameter(Value=value)
+    static member bytesOrNone(value: byte[] option) =
+        match value with
+        | Some value -> Sql.bytes value
+        | None -> Sql.dbnull
+
+    static member inline table(typeName: string, value: DataTable) =
+        SqlParameter(Value = value,
+                     TypeName = typeName,
+                     SqlDbType = SqlDbType.Structured)
+
+    static member parameter(genericParameter: SqlParameter) = genericParameter
 
 [<RequireQualifiedAccess>]
 module Sql =
-    open FSharp.Control.Tasks.V2.ContextInsensitive
 
     type SqlProps = private {
         ConnectionString : string
         SqlQuery : string option
-        Parameters : SqlRow
+        Parameters : (string * SqlParameter) list
         IsFunction : bool
         Timeout: int option
         NeedPrepare : bool
+        CancellationToken: CancellationToken 
+        ExistingConnection : SqlConnection option
     }
 
     let private defaultProps() = {
@@ -46,10 +106,12 @@ module Sql =
         IsFunction = false
         NeedPrepare = false
         Timeout = None
+        CancellationToken = CancellationToken.None
+        ExistingConnection = None
     }
 
     let connect constr  = { defaultProps() with ConnectionString = constr }
-
+    let existingConnection (connection: SqlConnection) = { defaultProps() with ExistingConnection = connection |> Option.ofObj }
     let query (sqlQuery: string) props = { props with SqlQuery = Some sqlQuery }
     let queryStatements (sqlQuery: string list) props = { props with SqlQuery = Some (String.concat "\n" sqlQuery) }
     let storedProcedure (sqlQuery: string) props = { props with SqlQuery = Some sqlQuery; IsFunction = true }
@@ -57,256 +119,21 @@ module Sql =
     let parameters ls props = { props with Parameters = ls }
     let timeout n props = { props with Timeout = Some n }
 
-    let toBool = function
-        | SqlValue.Bool x -> x
-        | value -> failwithf "Could not convert %A into a boolean value" value
-
-    let toTinyint = function
-        | SqlValue.TinyInt x -> x
-        | value -> failwithf "Could not convert %A into a tinyint" value
-
-    let toSmallint = function
-        | SqlValue.Smallint x -> x
-        | value -> failwithf "Could not convert %A into a short (int16)" value
-
-    let toInt = function
-        | SqlValue.Int x -> x
-        | value -> failwithf "Could not convert %A into an integer" value
-
-    let toBigint = function
-        | SqlValue.Bigint x -> x
-        | value -> failwithf "Could not convert %A into long (int64)" value
-
-    let toString = function
-        | SqlValue.String x -> x
-        | value -> failwithf "Could not convert %A into a string" value
-
-    let toDateTime = function
-        | SqlValue.DateTime x -> x
-        | value -> failwithf "Could not convert %A into a DateTime" value
-
-    let toDateTimeOffset = function
-        | SqlValue.DateTimeOffset x -> x
-        | value -> failwithf "Could not convert %A into a DateTimeOffset" value
-
-    let toFloat = function
-        | SqlValue.Float x -> x
-        | value -> failwithf "Could not convert %A into a floating number" value
-
-    let toBinary = function
-        | SqlValue.Binary bytes -> bytes
-        | value -> failwithf "Could not convert %A into binary (i.e. byte[]) value" value
-
-    let toDecimal = function
-        | SqlValue.Decimal value -> value
-        | value -> failwithf "Could not convert %A into decimal value" value
-
-    let toUniqueIdentifier = function
-        | SqlValue.UniqueIdentifier guid -> guid
-        | value ->  failwithf "Could not convert %A into Guid value" value
-
-    let readValue value =
-        let valueType = value.GetType()
-        if isNull value
-        then SqlValue.Null
-        elif valueType = typeof<uint8>
-        then SqlValue.TinyInt (unbox<uint8> value)
-        elif valueType = typeof<int16>
-        then SqlValue.Smallint (unbox<int16> value)
-        elif valueType = typeof<int32>
-        then SqlValue.Int (unbox<int32> value)
-        elif valueType = typeof<int64>
-        then SqlValue.Bigint (unbox<int64> value)
-        elif valueType = typeof<bool>
-        then SqlValue.Bool (unbox<bool> value)
-        elif valueType = typeof<float>
-        then SqlValue.Float (unbox<float> value)
-        elif valueType = typeof<decimal>
-        then SqlValue.Decimal (unbox<decimal> value)
-        elif valueType = typeof<DateTime>
-        then SqlValue.DateTime (unbox<DateTime> value)
-        elif valueType = typeof<DateTimeOffset>
-        then SqlValue.DateTimeOffset (unbox<DateTimeOffset> value)
-        elif valueType = typeof<byte[]>
-        then SqlValue.Binary (unbox<byte[]> value)
-        elif valueType = typeof<string>
-        then SqlValue.String (unbox<string> value)
-        elif valueType = typeof<Guid>
-        then SqlValue.UniqueIdentifier (unbox<Guid> value)
-        else failwithf "Could not convert value of type '%s' to SqlValue" (valueType.FullName)
-
-    let readTinyInt name (row: SqlRow) =
-        row
-        |> List.tryFind (fun (colName, value) -> colName = name)
-        |> Option.map snd
-        |> function
-            | Some (SqlValue.TinyInt value) -> Some value
-            | _ -> None
-
-    let readSmallInt name (row: SqlRow) =
-        row
-        |> List.tryFind (fun (colName, value) -> colName = name)
-        |> Option.map snd
-        |> function
-            | Some (SqlValue.Smallint value) -> Some value
-            | _ -> None
-
-    let readInt name (row: SqlRow) =
-        row
-        |> List.tryFind (fun (colName, value) -> colName = name)
-        |> Option.map snd
-        |> function
-            | Some (SqlValue.Int value) -> Some value
-            | _ -> None
-
-    let readBigInt name (row: SqlRow)  =
-        row
-        |> List.tryFind (fun (colName, value) -> colName = name)
-        |> Option.map snd
-        |> function
-            | Some (SqlValue.Bigint value) -> Some value
-            | _ -> None
-
-    let readString name (row: SqlRow) =
-        row
-        |> List.tryFind (fun (colName, value) -> colName = name)
-        |> Option.map snd
-        |> function
-            | Some (SqlValue.String value) -> Some value
-            | _ -> None
-
-    let readDateTime name (row: SqlRow) =
-        row
-        |> List.tryFind (fun (colName, value) -> colName = name)
-        |> Option.map snd
-        |> function
-            | Some (SqlValue.DateTime value) -> Some value
-            | _ -> None
-
-    let readBool name (row: SqlRow) =
-        row
-        |> List.tryFind (fun (colName, value) -> colName = name)
-        |> Option.map snd
-        |> function
-            | Some (SqlValue.Bool value) -> Some value
-            | _ -> None
-
-    let readDecimal name (row: SqlRow) =
-        row
-        |> List.tryFind (fun (colName, value) -> colName = name)
-        |> Option.map snd
-        |> function
-            | Some (SqlValue.Decimal value) -> Some value
-            | _ -> None
-
-    let readFloat name (row: SqlRow) =
-        row
-        |> List.tryFind (fun (colName, value) -> colName = name)
-        |> Option.map snd
-        |> function
-            | Some (SqlValue.Float value) -> Some value
-            | _ -> None
-
-    let readDateTimeOffset name (row: SqlRow) =
-        row
-        |> List.tryFind (fun (colName, value) -> colName = name)
-        |> Option.map snd
-        |> function
-            | Some (SqlValue.DateTimeOffset value) -> Some value
-            | _ -> None
-
-    let readUniqueIdentifier name (row: SqlRow) =
-        row
-        |> List.tryFind (fun (colName, value) -> colName = name)
-        |> Option.map snd
-        |> function
-            | Some (SqlValue.UniqueIdentifier value) -> Some value
-            | _ -> None
-
-    let readRow (reader : SqlDataReader) : SqlRow =
-
-        let readFieldSync fieldIndex =
-
-            let fieldName = reader.GetName(fieldIndex)
-            if reader.IsDBNull(fieldIndex)
-            then fieldName, SqlValue.Null
-            else fieldName, readValue (reader.GetFieldValue(fieldIndex))
-
-        [0 .. reader.FieldCount - 1]
-        |> List.map readFieldSync
-
-    let readRowTask (reader: SqlDataReader) =
-        let readValueTask fieldIndex =
-          task {
-              let fieldName = reader.GetName fieldIndex
-              let! isNull = reader.IsDBNullAsync fieldIndex
-              if isNull then
-                return fieldName, SqlValue.Null
-              else
-                let! value = reader.GetFieldValueAsync fieldIndex
-                return fieldName, readValue value
-          }
-
-        [0 .. reader.FieldCount - 1]
-        |> List.map readValueTask
-        |> Task.WhenAll
-
-    let readRowAsync (reader: SqlDataReader) =
-        readRowTask reader
-        |> Async.AwaitTask
-
-    let readTable (reader: SqlDataReader) : SqlTable =
-        [ while reader.Read() do yield readRow reader ]
-
-    let readTableTask (reader: SqlDataReader) =
-        let rec readRows rows = task {
-            let! canRead = reader.ReadAsync()
-            if canRead then
-              let! row = readRowTask reader
-              return! readRows (List.ofArray row :: rows)
-            else
-              return rows
-        }
-        readRows []
-
-    let readTableAsync (reader: SqlDataReader) =
-        readTableTask reader
-        |> Async.AwaitTask
-
-    let populateRow (cmd: SqlCommand) (row: SqlRow) =
-        for param in row do
-            let paramValue : obj =
-                match snd param with
-                | SqlValue.String text -> upcast text
-                | SqlValue.TinyInt x -> upcast x
-                | SqlValue.Smallint x -> upcast x
-                | SqlValue.Int i -> upcast i
-                | SqlValue.Bigint x -> upcast x
-                | SqlValue.DateTime date -> upcast date
-                | SqlValue.Float n -> upcast n
-                | SqlValue.Bool b -> upcast b
-                | SqlValue.Decimal x -> upcast x
-                | SqlValue.Null -> upcast DBNull.Value
-                | SqlValue.Binary bytes -> upcast bytes
-                | SqlValue.UniqueIdentifier guid -> upcast guid
-                | SqlValue.DateTimeOffset x -> upcast x
-                | SqlValue.Table (_, x) -> upcast x
-
+    let populateRow (cmd: SqlCommand) (row: (string * SqlParameter) list) =
+        for (parameterName, parameter) in row do
             // prepend param name with @ if it doesn't already
-            let paramName =
-                if (fst param).StartsWith("@")
-                then fst param
-                else sprintf "@%s" (fst param)
+            let normalizedName =
+                if parameterName.StartsWith("@")
+                then parameterName
+                else sprintf "@%s" parameterName
 
-            match snd param with
-            | SqlValue.Table (typeName, _) ->
-                let tableParam = cmd.Parameters.AddWithValue(paramName, paramValue)
-                // TypeName must be set to the custom SQL tvp type
-                tableParam.TypeName <- typeName
-                // SqlDbType must be set to Structured for a table-valued parameter
-                tableParam.SqlDbType <- SqlDbType.Structured
-            | _ ->
-                cmd.Parameters.AddWithValue(paramName, paramValue) |> ignore
+            parameter.ParameterName <- normalizedName
+            ignore (cmd.Parameters.Add(parameter))
+
+    let private getConnection (props: SqlProps): SqlConnection =
+        match props.ExistingConnection with
+        | Some connection -> connection
+        | None -> new SqlConnection(props.ConnectionString)
 
     let private populateCmd (cmd: SqlCommand) (props: SqlProps) =
         if props.IsFunction then cmd.CommandType <- CommandType.StoredProcedure
@@ -317,341 +144,205 @@ module Sql =
 
         populateRow cmd props.Parameters
 
-    let executeReader (read: SqlDataReader -> Option<'t>) (props: SqlProps) : 't list =
-        if Option.isNone props.SqlQuery then failwith "No query provided to execute"
-        use connection = new SqlConnection(props.ConnectionString)
-        connection.Open()
-        use command = new SqlCommand(Option.get props.SqlQuery, connection)
-        if props.NeedPrepare then command.Prepare()
-        populateCmd command props
-        use reader = command.ExecuteReader()
-        let rows = ResizeArray<'t>()
-        while reader.Read() do
-            reader
-            |> read
-            |> Option.iter rows.Add
-        List.ofSeq rows
-
-    let executeTransaction queries (props: SqlProps)  =
-        if List.isEmpty queries
-        then [ ]
-        else
-        use connection = new SqlConnection(props.ConnectionString)
-        connection.Open()
-        use transaction = connection.BeginTransaction()
-        let affectedRowsByQuery = ResizeArray<int>()
-        for (query, parameterSets) in queries do
-            if List.isEmpty parameterSets
-            then
-                use command = new SqlCommand(query, connection, transaction)
-                let affectedRows = command.ExecuteNonQuery()
-                affectedRowsByQuery.Add affectedRows
-            else
-              for parameterSet in parameterSets do
-                  use command = new SqlCommand(query, connection, transaction)
-                  populateRow command parameterSet
-                  let affectedRows = command.ExecuteNonQuery()
-                  affectedRowsByQuery.Add affectedRows
-        transaction.Commit()
-        List.ofSeq affectedRowsByQuery
-
-    let executeTransactionAsync queries (props: SqlProps)  =
-        async {
-            if List.isEmpty queries
-            then return [ ]
-            else
-            use connection = new SqlConnection(props.ConnectionString)
-            do! Async.AwaitTask (connection.OpenAsync())
-            use transaction = connection.BeginTransaction()
-            let affectedRowsByQuery = ResizeArray<int>()
-            for (query, parameterSets) in queries do
-                if List.isEmpty parameterSets
-                then
-                    use command = new SqlCommand(query, connection, transaction)
-                    let! affectedRows = Async.AwaitTask(command.ExecuteNonQueryAsync())
-                    affectedRowsByQuery.Add affectedRows
-                else
-                  for parameterSet in parameterSets do
-                      use command = new SqlCommand(query, connection, transaction)
-                      populateRow command parameterSet
-                      let! affectedRows = Async.AwaitTask(command.ExecuteNonQueryAsync())
-                      affectedRowsByQuery.Add affectedRows
-            transaction.Commit()
-            return List.ofSeq affectedRowsByQuery
-        }
-
-
-    let executeTransactionSafe queries (props: SqlProps) =
+    let executeTransaction queries (props: SqlProps) =
         try
             if List.isEmpty queries
             then Ok [ ]
             else
-            use connection = new SqlConnection(props.ConnectionString)
-            connection.Open()
-            use transaction = connection.BeginTransaction()
-            let affectedRowsByQuery = ResizeArray<int>()
-            for (query, parameterSets) in queries do
-                if List.isEmpty parameterSets
-                then
-                    use command = new SqlCommand(query, connection, transaction)
-                    let affectedRows = command.ExecuteNonQuery()
-                    affectedRowsByQuery.Add affectedRows
-                else
-                    for parameterSet in parameterSets do
-                        use command = new SqlCommand(query, connection, transaction)
-                        populateRow command parameterSet
-                        let affectedRows = command.ExecuteNonQuery()
-                        affectedRowsByQuery.Add affectedRows
-            transaction.Commit()
-            Ok (List.ofSeq affectedRowsByQuery)
-        with
-        | ex -> Error ex
-
-    let executeTransactionTask queries (props: SqlProps)  =
-        task {
-            if List.isEmpty queries
-            then return [ ]
-            else
-            use connection = new SqlConnection(props.ConnectionString)
-            do! connection.OpenAsync()
-            use transaction = connection.BeginTransaction()
-            let affectedRowsByQuery = ResizeArray<int>()
-            for (query, parameterSets) in queries do
-                if List.isEmpty parameterSets
-                then
-                    use command = new SqlCommand(query, connection, transaction)
-                    let! affectedRows = command.ExecuteNonQueryAsync()
-                    affectedRowsByQuery.Add affectedRows
-                else
-                  for parameterSet in parameterSets do
-                      use command = new SqlCommand(query, connection, transaction)
-                      populateRow command parameterSet
-                      let! affectedRows = command.ExecuteNonQueryAsync()
-                      affectedRowsByQuery.Add affectedRows
-            transaction.Commit()
-            return List.ofSeq affectedRowsByQuery
-        }
-
-    let executeTransactionSafeTask queries (props: SqlProps)  =
-        task {
+            let connection = getConnection props
             try
-                if List.isEmpty queries
-                then return Ok [ ]
-                else
-                use connection = new SqlConnection(props.ConnectionString)
-                do! connection.OpenAsync()
+                if not (connection.State.HasFlag ConnectionState.Open)
+                then connection.Open()
                 use transaction = connection.BeginTransaction()
                 let affectedRowsByQuery = ResizeArray<int>()
                 for (query, parameterSets) in queries do
                     if List.isEmpty parameterSets
                     then
-                        use command = new SqlCommand(query, connection, transaction)
-                        let! affectedRows = command.ExecuteNonQueryAsync()
-                        affectedRowsByQuery.Add affectedRows
+                       use command = new SqlCommand(query, connection, transaction)
+                       let affectedRows = command.ExecuteNonQuery()
+                       affectedRowsByQuery.Add affectedRows
                     else
                       for parameterSet in parameterSets do
-                          use command = new SqlCommand(query, connection, transaction)
-                          populateRow command parameterSet
-                          let! affectedRows = command.ExecuteNonQueryAsync()
-                          affectedRowsByQuery.Add affectedRows
+                        use command = new SqlCommand(query, connection, transaction)
+                        populateRow command parameterSet
+                        let affectedRows = command.ExecuteNonQuery()
+                        affectedRowsByQuery.Add affectedRows
+
                 transaction.Commit()
-                return Ok (List.ofSeq affectedRowsByQuery)
-            with
-            | ex -> return Error ex
-        }
+                Ok (List.ofSeq affectedRowsByQuery)
+            finally
+                if props.ExistingConnection.IsNone
+                then connection.Dispose()
 
-    let executeTransactionSafeAsync queries (props: SqlProps)  =
-        executeTransactionSafeTask queries props
-        |> Async.AwaitTask
-
-    let executeReaderSafe (read: SqlDataReader -> Option<'t>) (props: SqlProps) =
-        try
-            if Option.isNone props.SqlQuery then failwith "No query provided to execute"
-            use connection = new SqlConnection(props.ConnectionString)
-            connection.Open()
-            use command = new SqlCommand(Option.get props.SqlQuery, connection)
-            if props.NeedPrepare then command.Prepare()
-            populateCmd command props
-            use reader = command.ExecuteReader()
-            let rows = ResizeArray<'t>()
-            while reader.Read() do
-                read reader
-                |> Option.iter rows.Add
-            Ok (List.ofSeq rows)
         with
-        | ex -> Error ex
+        | error -> Error error
 
-    let executeReaderAsync (read: SqlDataReader -> Option<'t>) (props: SqlProps) : Async<'t list> =
+    let executeTransactionAsync queries (props: SqlProps)  =
         async {
-            if Option.isNone props.SqlQuery then failwith "No query provided to execute"
-            use connection = new SqlConnection(props.ConnectionString)
-            do! Async.AwaitTask (connection.OpenAsync())
-            use command = new SqlCommand(Option.get props.SqlQuery, connection)
-            if props.NeedPrepare then command.Prepare()
-            populateCmd command props
-            use! reader = Async.AwaitTask (command.ExecuteReaderAsync())
-            let rows = ResizeArray<'t>()
-            while reader.Read() do
-                reader
-                |> read
-                |> Option.iter rows.Add
-            return List.ofSeq rows
-        }
-
-    let executeReaderSafeAsync (read: SqlDataReader -> Option<'t>) (props: SqlProps) =
-        async {
-            let! result = Async.Catch (executeReaderAsync read props)
-            match result with
-            | Choice1Of2 value -> return Ok (value)
-            | Choice2Of2 err -> return Error (err)
-        }
-
-    let executeTable (props: SqlProps) : SqlTable =
-        if Option.isNone props.SqlQuery then failwith "No query provided to execute"
-        use connection = new SqlConnection(props.ConnectionString)
-        connection.Open()
-        use command = new SqlCommand(Option.get props.SqlQuery, connection)
-        if props.NeedPrepare then command.Prepare()
-        populateCmd command props
-        use reader = command.ExecuteReader()
-        readTable reader
-
-    let executeTableSafe (props: SqlProps) : Result<SqlTable, exn> =
-        try Ok (executeTable props)
-        with | ex -> Error ex
-
-    let executeTableTask (props: SqlProps) =
-        task {
-            if Option.isNone props.SqlQuery then failwith "No query provided to execute..."
-            use connection = new SqlConnection(props.ConnectionString)
-            do! connection.OpenAsync()
-            use command = new SqlCommand(Option.get props.SqlQuery, connection)
-            if props.NeedPrepare then command.Prepare()
-            do populateCmd command props
-            use! reader = command.ExecuteReaderAsync()
-            return! readTableTask reader
-        }
-
-    let executeTableAsync (props: SqlProps) =
-        executeTableTask props
-        |> Async.AwaitTask
-
-    let executeTableSafeTask (props: SqlProps) =
-        task {
             try
-                if Option.isNone props.SqlQuery then failwith "No query provided to execute"
-                use connection = new SqlConnection(props.ConnectionString)
-                do! connection.OpenAsync()
-                use command = new SqlCommand(Option.get props.SqlQuery, connection)
-                if props.NeedPrepare then command.Prepare()
+                let! token = Async.CancellationToken
+                use mergedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(token, props.CancellationToken)
+                let mergedToken = mergedTokenSource.Token
+                if List.isEmpty queries
+                then return Ok [ ]
+                else
+                let connection = getConnection props
+                try
+                    if not (connection.State.HasFlag ConnectionState.Open)
+                    then do! Async.AwaitTask (connection.OpenAsync mergedToken)
+                    use transaction = connection.BeginTransaction ()
+                    let affectedRowsByQuery = ResizeArray<int>()
+                    for (query, parameterSets) in queries do
+                        if List.isEmpty parameterSets
+                        then
+                          use command = new SqlCommand(query, connection, transaction)
+                          let! affectedRows = Async.AwaitTask (command.ExecuteNonQueryAsync mergedToken)
+                          affectedRowsByQuery.Add affectedRows
+                        else
+                          for parameterSet in parameterSets do
+                            use command = new SqlCommand(query, connection, transaction)
+                            populateRow command parameterSet
+                            let! affectedRows = Async.AwaitTask (command.ExecuteNonQueryAsync mergedToken)
+                            affectedRowsByQuery.Add affectedRows
+                    transaction.Commit()
+                    return Ok (List.ofSeq affectedRowsByQuery)
+                finally
+                    if props.ExistingConnection.IsNone
+                    then connection.Dispose()
+            with error ->
+                return Error error
+        }
+
+    let execute (read: RowReader -> 't) (props: SqlProps) : Result<'t list, exn> =
+        try
+            if props.SqlQuery.IsNone then failwith "No query provided to execute. Please use Sql.query"
+            let connection = getConnection props
+            try
+                if not (connection.State.HasFlag ConnectionState.Open)
+                then connection.Open()
+                use command = new SqlCommand(props.SqlQuery.Value, connection)
                 do populateCmd command props
-                use! reader = command.ExecuteReaderAsync()
-                let! result = readTableTask reader
-                return Ok (result)
-            with
-            | ex -> return Error ex
+                if props.NeedPrepare then command.Prepare()
+                use reader = command.ExecuteReader()
+                let rowReader = RowReader(reader)
+                let result = ResizeArray<'t>()
+                while reader.Read() do result.Add (read rowReader)
+                Ok (List.ofSeq result)
+            finally
+                if props.ExistingConnection.IsNone
+                then connection.Dispose()
+        with error ->
+            Error error
+
+    let iter (read: RowReader -> unit) (props: SqlProps) : Result<unit, exn> =
+        try
+            if props.SqlQuery.IsNone then failwith "No query provided to execute. Please use Sql.query"
+            let connection = getConnection props
+            try
+                if not (connection.State.HasFlag ConnectionState.Open)
+                then connection.Open()
+                use command = new SqlCommand(props.SqlQuery.Value, connection)
+                do populateCmd command props
+                if props.NeedPrepare then command.Prepare()
+                use reader = command.ExecuteReader()
+                let rowReader = RowReader(reader)
+                while reader.Read() do read rowReader
+                Ok ()
+            finally
+                if props.ExistingConnection.IsNone
+                then connection.Dispose()
+        with error ->
+            Error error
+
+    let iterAsync (read: RowReader -> unit) (props: SqlProps) : Async<Result<unit, exn>> =
+        async {
+            try
+                let! token =  Async.CancellationToken
+                use mergedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(token, props.CancellationToken)
+                let mergedToken = mergedTokenSource.Token
+                if props.SqlQuery.IsNone then failwith "No query provided to execute. Please use Sql.query"
+                let connection = getConnection props
+                try
+                    if not (connection.State.HasFlag ConnectionState.Open)
+                    then do! Async.AwaitTask(connection.OpenAsync(mergedToken))
+                    use command = new SqlCommand(props.SqlQuery.Value, connection)
+                    do populateCmd command props
+                    if props.NeedPrepare then command.Prepare()
+                    use! reader = Async.AwaitTask (command.ExecuteReaderAsync(mergedToken))
+                    let rowReader = RowReader(reader)
+                    while reader.Read() do read rowReader
+                    return Ok ()
+                finally
+                    if props.ExistingConnection.IsNone
+                    then connection.Dispose()
+            with error ->
+                return Error error
         }
 
-    let executeTableSafeAsync (props: SqlProps) =
-        executeTableSafeTask props
-        |> Async.AwaitTask
-
-    let multiline xs = String.concat Environment.NewLine xs
-
-    let executeScalar (props: SqlProps) : SqlValue =
-        if Option.isNone props.SqlQuery then failwith "No query provided to execute..."
-        use connection = new SqlConnection(props.ConnectionString)
-        connection.Open()
-        use command = new SqlCommand(Option.get props.SqlQuery, connection)
-        if props.NeedPrepare then command.Prepare()
-        populateCmd command props
-        command.ExecuteScalar()
-        |> readValue
-
-    let executeNonQuery (props: SqlProps) : int =
-        if Option.isNone props.SqlQuery then failwith "No query provided to execute..."
-        use connection = new SqlConnection(props.ConnectionString)
-        connection.Open()
-        use command = new SqlCommand(Option.get props.SqlQuery, connection)
-        if props.NeedPrepare then command.Prepare()
-        populateCmd command props
-        command.ExecuteNonQuery()
-
-    let executeNonQuerySafe (props: SqlProps) : Result<int, exn> =
-        try Ok (executeNonQuery props)
-        with | ex -> Error ex
-
-    let executeNonQueryTask (props: SqlProps) =
-        task {
-            use connection = new SqlConnection(props.ConnectionString)
-            do! connection.OpenAsync()
-            use command = new SqlCommand(Option.get props.SqlQuery, connection)
-            if props.NeedPrepare then command.Prepare()
-            do populateCmd command props
-            return! command.ExecuteNonQueryAsync()
+    let executeAsync (read: RowReader -> 't) (props: SqlProps) : Async<Result<'t list, exn>> =
+        async {
+            try
+                let! token =  Async.CancellationToken
+                use mergedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(token, props.CancellationToken)
+                let mergedToken = mergedTokenSource.Token
+                if props.SqlQuery.IsNone then failwith "No query provided to execute. Please use Sql.query"
+                let connection = getConnection props
+                try
+                    if not (connection.State.HasFlag ConnectionState.Open)
+                    then do! Async.AwaitTask(connection.OpenAsync(mergedToken))
+                    use command = new SqlCommand(props.SqlQuery.Value, connection)
+                    do populateCmd command props
+                    if props.NeedPrepare then command.Prepare()
+                    use! reader = Async.AwaitTask (command.ExecuteReaderAsync(mergedToken))
+                    let rowReader = RowReader(reader)
+                    let result = ResizeArray<'t>()
+                    while reader.Read() do result.Add (read rowReader)
+                    return Ok (List.ofSeq result)
+                finally
+                    if props.ExistingConnection.IsNone
+                    then connection.Dispose()
+            with error ->
+                return Error error
         }
 
+    /// Executes the query and returns the number of rows affected
+    let executeNonQuery (props: SqlProps) : Result<int, exn> =
+        try
+            if props.SqlQuery.IsNone then failwith "No query provided to execute..."
+            let connection = getConnection props
+            try
+                if not (connection.State.HasFlag ConnectionState.Open)
+                then connection.Open()
+                use command = new SqlCommand(props.SqlQuery.Value, connection)
+                populateCmd command props
+                if props.NeedPrepare then command.Prepare()
+                Ok (command.ExecuteNonQuery())
+            finally
+                if props.ExistingConnection.IsNone
+                then connection.Dispose()
+        with
+            | error -> Error error
+
+    /// Executes the query as asynchronously and returns the number of rows affected
     let executeNonQueryAsync  (props: SqlProps) =
-        executeNonQueryTask props
-        |> Async.AwaitTask
-
-    let executeNonQuerySafeTask (props: SqlProps) =
-        task {
+        async {
             try
-                use connection = new SqlConnection(props.ConnectionString)
-                do! connection.OpenAsync()
-                use command = new SqlCommand(Option.get props.SqlQuery, connection)
-                if props.NeedPrepare then command.Prepare()
-                do populateCmd command props
-                let! result = command.ExecuteNonQueryAsync()
-                return Ok (result)
+                let! token = Async.CancellationToken
+                use mergedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(token, props.CancellationToken)
+                let mergedToken = mergedTokenSource.Token
+                if props.SqlQuery.IsNone then failwith "No query provided to execute. Please use Sql.query"
+                let connection = getConnection props
+                try
+                    if not (connection.State.HasFlag ConnectionState.Open)
+                    then do! Async.AwaitTask (connection.OpenAsync(mergedToken))
+                    use command = new SqlCommand(props.SqlQuery.Value, connection)
+                    populateCmd command props
+                    if props.NeedPrepare then command.Prepare()
+                    let! affectedRows = Async.AwaitTask(command.ExecuteNonQueryAsync(mergedToken))
+                    return Ok affectedRows
+                finally
+                    if props.ExistingConnection.IsNone
+                    then connection.Dispose()
             with
-            | ex -> return Error ex
+            | error -> return Error error
         }
-
-    let executeNonQuerySafeAsync (props: SqlProps) =
-        executeNonQuerySafeTask props
-        |> Async.AwaitTask
-
-    let executeScalarSafe (props: SqlProps) : Result<SqlValue, exn> =
-        try  Ok (executeScalar props)
-        with | ex -> Error ex
-
-    let executeScalarTask (props: SqlProps) =
-        task {
-            if Option.isNone props.SqlQuery then failwith "No query provided to execute..."
-            use connection = new SqlConnection(props.ConnectionString)
-            do! connection.OpenAsync()
-            use command = new SqlCommand(Option.get props.SqlQuery, connection)
-            if props.NeedPrepare then command.Prepare()
-            do populateCmd command props
-            let! value = command.ExecuteScalarAsync()
-            return readValue value
-        }
-
-    let executeScalarAsync (props: SqlProps) =
-        executeScalarTask props
-        |> Async.AwaitTask
-
-
-    let executeScalarSafeTask (props: SqlProps) =
-        task {
-            try
-                if Option.isNone props.SqlQuery then failwith "No query provided to execute..."
-                use connection = new SqlConnection(props.ConnectionString)
-                do! connection.OpenAsync()
-                use command = new SqlCommand(Option.get props.SqlQuery, connection)
-                if props.NeedPrepare then command.Prepare()
-                do populateCmd command props
-                let! value = command.ExecuteScalarAsync()
-                return Ok (readValue value)
-            with
-            | ex -> return Error ex
-        }
-
-    let executeScalarSafeAsync (props: SqlProps) =
-        executeScalarSafeTask props
-        |> Async.AwaitTask
-
-    let mapEachRow (f: SqlRow -> Option<'a>) (table: SqlTable) =
-        List.choose f table

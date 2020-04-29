@@ -1,6 +1,6 @@
 # DustyTables
 
-Functional wrapper around plain old (dusty?) `SqlClient` to simplify data access when talking to MS Sql Server databases. 
+Functional wrapper around plain old (dusty?) `SqlClient` to simplify data access when talking to MS Sql Server databases.
 
 ## Install
 ```bash
@@ -14,26 +14,22 @@ dotnet add package DustyTables
 ## Query a table
 ```fs
 open DustyTables
-open DustyTables.OptionWorkflow
 
 // get the connection from the environment
 let connectionString() = Env.getVar "app_db"
 
 type User = { Id: int; Username: string }
 
-let getUsers() : User list = 
+let getUsers() : Result<User list, exn> =
     connectionString()
     |> Sql.connect
-    |> Sql.query "select * from dbo.[users]"
-    |> Sql.executeTable 
-    |> Sql.mapEachRow (fun row -> 
-        option {
-            let! id = Sql.readInt "user_id" row
-            let! username = Sql.readString "username" row
-            return { Id = id; Username = username }
+    |> Sql.query "SELECT * FROM dbo.[Users]"
+    |> Sql.execute (fun read ->
+        {
+            Id = read.int "user_id"
+            Username = read.string "username"
         })
 ```
-Notice that we are using the `option` workflow which means if any row has "user_id" or "username" as NULL it will be skipped
 
 ## Handle null values from table columns:
 ```fs
@@ -45,105 +41,52 @@ let connectionString() = Env.getVar "app_db"
 
 type User = { Id: int; Username: string; LastModified : Option<DateTime> }
 
-let getUsers() : User list = 
+let getUsers() : Result<User list, exn> =
     connectionString()
     |> Sql.connect
-    |> Sql.query "select * from dbo.[users]"
-    |> Sql.executeTable 
-    |> Sql.mapEachRow (fun row -> 
-        option {
-            let! id = Sql.readInt "user_id" row
-            let! username = Sql.readString "username" row
-            // using "let" instead of "let!"
-            let lastModified = Sql.readDateTime "last_modified" row
-            return { 
-                Id = id; 
-                Username = username
-                LastModified = lastModified  
-            }
+    |> Sql.query "SELECT * FROM dbo.[users]"
+    |> Sql.execute(fun read ->
+        {
+            Id = read.int "user_id"
+            Username = read.string "username"
+            // Notice here using `orNone` reader variants
+            LastModified = read.dateTimeOrNone "last_modified"
         })
 ```
 ## Providing default values for null columns:
 ```fs
 open DustyTables
-open DustyTables.OptionWorkflow
 
 // get the connection from the environment
 let connectionString() = Env.getVar "app_db"
 
 type User = { Id: int; Username: string; Biography : string }
 
-let getUsers() : User list = 
+let getUsers() : Result<User list, exn> =
     connectionString()
     |> Sql.connect
     |> Sql.query "select * from dbo.[users]"
-    |> Sql.executeTable 
-    |> Sql.mapEachRow (fun row -> 
-        option {
-            let! id = Sql.readInt "user_id" row
-            let! username = Sql.readString "username" row
-            let userBiography = Sql.readString "bio" row
-            return { 
-                Id = id; 
-                Username = username
-                Biography = defaultArg userBiography ""
-            }
+    |> Sql.execute (fun read ->
+        {
+            Id = read.int "user_id";
+            Username = read.string "username"
+            Biography = defaultArg (read.stringOrNone "bio") ""
         })
-```
-## Query a scalar value safely:
-```fs
-open DustyTables
-open DustyTables.OptionWorkflow
-
-// get the connection from the environment
-let connectionString() = Env.getVar "app_db"
-
-let pingDatabase() : Option<DateTime> = 
-    connectionString()
-    |> Sql.connect
-    |> Sql.query "select getdate()"
-    |> Sql.executeScalarSafe 
-    |> function 
-        | Ok (SqlValue.DateTime time) -> Some time
-        | otherwise -> None
-```
-### Query a scalar value asynchronously
-```fs
-open DustyTables
-open DustyTables.OptionWorkflow
-
-// get the connection from the environment
-let connectionString() = Env.getVar "app_db"
-
-let pingDatabase() : Async<Option<DateTime>> = 
-    async {
-        let! serverTime = 
-            connectionString()
-            |> Sql.connect
-            |> Sql.query "select getdate()"
-            |> Sql.executeScalarSafeAsync
-        
-        match serverTime with 
-        | Ok (SqlValue.DateTime time) -> return Some time
-        | otherwise -> return None
-    }
 ```
 ## Execute a parameterized query
 ```fs
 open DustyTables
-open DustyTables.OptionWorkflow
 
 // get the connection from the environment
 let connectionString() = Env.getVar "app_db"
 
 // get product names by category
-let productsByCategory (category: string) : string list = 
+let productsByCategory (category: string) : Result<string list, exn> =
     connectionString()
     |> Sql.connect
-    |> Sql.query "select name from dbo.[products] where category = @category"
-    |> Sql.parameters [ "@category", SqlValue.String category ]
-    |> Sql.executeTable
-    |> Sql.mapEachRow (Sql.readString "name")
+    |> Sql.query "SELECT name FROM dbo.[Products] where category = @category"
+    |> Sql.parameters [ "@category", Sql.string category ]
+    |> Sql.execute (fun read -> read.string "name")
 ```
 ### Executing a stored procedure with parameters
 ```fs
@@ -153,16 +96,18 @@ open DustyTables
 let connectionString() = Env.getVar "app_db"
 
 // check whether a user exists or not
-let userExists (username: string) : Async<bool> = 
+let userExists (username: string) : Async<Result<bool, exn>> =
     async {
-        let! userExists = 
+        return!
             connectionString()
             |> Sql.connect
             |> Sql.storedProcedure "user_exists"
-            |> Sql.parameters [ "@username", SqlValue.String username ]
-            |> Sql.executeScalarAsync 
-        
-        return Sql.toBool userExists 
+            |> Sql.parameters [ "@username", Sql.string username ]
+            |> Sql.execute (fun read -> read.bool 0)
+            |> function
+                | Ok [ result ] -> Ok result
+                | Error error -> Error error
+                | unexpected -> failwithf "Expected result %A"  unexpected
     }
 ```
 ### Executing a stored procedure with table-valued parameters
@@ -173,7 +118,7 @@ open System.Data
 // get the connection from the environment
 let connectionString() = Env.getVar "app_db"
 
-let executeMyStoredProcedure () : Async<int> = 
+let executeMyStoredProcedure () : Async<int> =
     // create a table-valued parameter
     let customSqlTypeName = "MyCustomSqlTypeName"
     let dataTable = new DataTable()
@@ -187,8 +132,8 @@ let executeMyStoredProcedure () : Async<int> =
     connectionString()
     |> Sql.connect
     |> Sql.storedProcedure "my_stored_proc"
-    |> Sql.parameters 
-        [ "@foo", SqlValue.Int 1 
+    |> Sql.parameters
+        [ "@foo", SqlValue.Int 1
           "@people", SqlValue.Table (customSqlTypeName, dataTable) ]
     |> Sql.executeNonQueryAsync
 ```
@@ -200,17 +145,17 @@ You only need a connection string to a working database, no tables/stored proced
 
 ## Builds
 
-MacOS/Linux | Windows
---- | ---
-[![Travis Badge](https://travis-ci.org/Zaid-Ajaj/DustyTables.svg?branch=master)](https://travis-ci.org/Zaid-Ajaj/DustyTables) | [![Build status](https://ci.appveyor.com/api/projects/status/github/Zaid-Ajaj/DustyTables?svg=true)](https://ci.appveyor.com/project/Zaid-Ajaj/DustyTables)
-[![Build History](https://buildstats.info/travisci/chart/Zaid-Ajaj/DustyTables)](https://travis-ci.org/Zaid-Ajaj/DustyTables/builds) | [![Build History](https://buildstats.info/appveyor/chart/Zaid-Ajaj/DustyTables)](https://ci.appveyor.com/project/Zaid-Ajaj/DustyTables)  
+| MacOS/Linux                                                                                                                          | Windows                                                                                                                                                     |
+| ------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [![Travis Badge](https://travis-ci.org/Zaid-Ajaj/DustyTables.svg?branch=master)](https://travis-ci.org/Zaid-Ajaj/DustyTables)        | [![Build status](https://ci.appveyor.com/api/projects/status/github/Zaid-Ajaj/DustyTables?svg=true)](https://ci.appveyor.com/project/Zaid-Ajaj/DustyTables) |
+| [![Build History](https://buildstats.info/travisci/chart/Zaid-Ajaj/DustyTables)](https://travis-ci.org/Zaid-Ajaj/DustyTables/builds) | [![Build History](https://buildstats.info/appveyor/chart/Zaid-Ajaj/DustyTables)](https://ci.appveyor.com/project/Zaid-Ajaj/DustyTables)                     |
 
 
-## Nuget 
+## Nuget
 
-Stable | Prerelease
---- | ---
-[![NuGet Badge](https://buildstats.info/nuget/DustyTables)](https://www.nuget.org/packages/DustyTables/) | [![NuGet Badge](https://buildstats.info/nuget/DustyTables?includePreReleases=true)](https://www.nuget.org/packages/DustyTables/)
+| Stable                                                                                                   | Prerelease                                                                                                                       |
+| -------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| [![NuGet Badge](https://buildstats.info/nuget/DustyTables)](https://www.nuget.org/packages/DustyTables/) | [![NuGet Badge](https://buildstats.info/nuget/DustyTables?includePreReleases=true)](https://www.nuget.org/packages/DustyTables/) |
 
 ---
 

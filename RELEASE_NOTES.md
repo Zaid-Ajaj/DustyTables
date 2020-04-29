@@ -1,3 +1,6 @@
+### 2.0.0 - 2020-04-29
+* Full rewrite and massive simplification
+
 #### 1.1.0 - 2019-04-13
 * Add Sql.executeTransactionAsync and account for parameterless transaction
 
