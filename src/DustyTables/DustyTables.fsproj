@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <TargetFrameworks>netstandard2.0</TargetFrameworks>
+        <TargetFrameworks>netstandard2.0;netcoreapp3.1</TargetFrameworks>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
     </PropertyGroup>
     <PropertyGroup>
@@ -14,8 +14,8 @@
         <RepositoryType>git</RepositoryType>
         <Authors>zaid-ajaj</Authors>
         <RepositoryUrl>https://github.com/zaid-ajaj/DustyTables</RepositoryUrl>
-        <Version>2.1.0</Version>
-        <PackageReleaseNotes>Flexible integer handling</PackageReleaseNotes>
+        <Version>2.2.0</Version>
+        <PackageReleaseNotes>Target netcoreapp3.1 and update SqlClient to v2.0</PackageReleaseNotes>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Configuration)'=='Release'">
         <Optimize>true</Optimize>
@@ -26,6 +26,6 @@
         <Compile Include="Sql.fs" />
     </ItemGroup>
     <ItemGroup>
-        <PackageReference Include="Microsoft.Data.SqlClient" Version="1.1.2" />
+        <PackageReference Include="Microsoft.Data.SqlClient" Version="2.0.0" />
     </ItemGroup>
 </Project>
