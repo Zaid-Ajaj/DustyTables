@@ -64,6 +64,13 @@ type Sql() =
         match value with
         | Some value -> Sql.dateTime(value)
         | None -> Sql.dbnull
+        
+    static member dateTimeOffset(value: DateTimeOffset) = SqlParameter(Value=value, DbType = DbType.DateTimeOffset)
+
+    static member dateTimeOffsetOrNone(value: DateTimeOffset option) =
+        match value with
+        | Some value -> Sql.dateTimeOffset(value)
+        | None -> Sql.dbnull
 
     static member uniqueidentifier(value: Guid) = SqlParameter(Value=value, DbType = DbType.Guid)
 
