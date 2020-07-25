@@ -14,8 +14,8 @@
         <RepositoryType>git</RepositoryType>
         <Authors>zaid-ajaj</Authors>
         <RepositoryUrl>https://github.com/zaid-ajaj/DustyTables</RepositoryUrl>
-        <Version>2.2.0</Version>
-        <PackageReleaseNotes>Target netcoreapp3.1 and update SqlClient to v2.0</PackageReleaseNotes>
+        <Version>2.3.0</Version>
+        <PackageReleaseNotes>Add DateTimeOffset parameter variants</PackageReleaseNotes>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Configuration)'=='Release'">
         <Optimize>true</Optimize>
