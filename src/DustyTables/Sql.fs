@@ -95,7 +95,7 @@ type Sql() =
 [<RequireQualifiedAccess>]
 module Sql =
 
-    type SqlProps = private {
+    type SqlProps = {
         ConnectionString : string
         SqlQuery : string option
         Parameters : (string * SqlParameter) list
