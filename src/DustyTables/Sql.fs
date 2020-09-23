@@ -50,7 +50,7 @@ type Sql() =
         match value with
         | Some value -> Sql.int16 value
         | None -> Sql.dbnull
-    
+
     static member int64(value: int64) = SqlParameter(Value = value, DbType = DbType.Int64)
 
     static member int64OrNone(value: int64 option) =
@@ -64,7 +64,7 @@ type Sql() =
         match value with
         | Some value -> Sql.dateTime(value)
         | None -> Sql.dbnull
-        
+
     static member dateTimeOffset(value: DateTimeOffset) = SqlParameter(Value=value, DbType = DbType.DateTimeOffset)
 
     static member dateTimeOffsetOrNone(value: DateTimeOffset option) =
@@ -102,7 +102,7 @@ module Sql =
         IsFunction : bool
         Timeout: int option
         NeedPrepare : bool
-        CancellationToken: CancellationToken 
+        CancellationToken: CancellationToken
         ExistingConnection : SqlConnection option
     }
 
@@ -240,6 +240,53 @@ module Sql =
                 then connection.Dispose()
         with error ->
             Error error
+
+    let executeRow (read: RowReader -> 't) (props: SqlProps) : Result<'t, exn> =
+        try
+            if Option.isNone props.SqlQuery then failwith "No query provided to execute. Please use Sql.query"
+            let connection = getConnection props
+            try
+                if not (connection.State.HasFlag ConnectionState.Open)
+                then connection.Open()
+                use command = new SqlCommand(props.SqlQuery.Value, connection)
+                do populateCmd command props
+                if props.NeedPrepare then command.Prepare()
+                use reader = command.ExecuteReader()
+                let rowReader = RowReader(reader)
+                if reader.Read()
+                then Ok (read rowReader)
+                else failwith "Expected at least one row to be returned from the result set. Instead it was empty"
+            finally
+                if props.ExistingConnection.IsNone
+                then connection.Dispose()
+        with error ->
+            Error error
+
+    let executeRowAsync (read: RowReader -> 't) (props: SqlProps) : Async<Result<'t, exn>> =
+        async {
+            try
+                let! token =  Async.CancellationToken
+                use mergedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(token, props.CancellationToken)
+                let mergedToken = mergedTokenSource.Token
+                if Option.isNone props.SqlQuery then failwith "No query provided to execute. Please use Sql.query"
+                let connection = getConnection props
+                try
+                    if not (connection.State.HasFlag ConnectionState.Open)
+                    then do! Async.AwaitTask(connection.OpenAsync(mergedToken))
+                    use command = new SqlCommand(props.SqlQuery.Value, connection)
+                    do populateCmd command props
+                    if props.NeedPrepare then command.Prepare()
+                    use! reader = Async.AwaitTask (command.ExecuteReaderAsync(mergedToken))
+                    let rowReader = RowReader(reader)
+                    if reader.Read()
+                    then return Ok (read rowReader)
+                    else return! failwith "Expected at least one row to be returned from the result set. Instead it was empty"
+                finally
+                    if props.ExistingConnection.IsNone
+                    then connection.Dispose()
+            with error ->
+                return Error error
+        }
 
     let iter (read: RowReader -> unit) (props: SqlProps) : Result<unit, exn> =
         try

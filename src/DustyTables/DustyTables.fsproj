@@ -14,8 +14,8 @@
         <RepositoryType>git</RepositoryType>
         <Authors>zaid-ajaj</Authors>
         <RepositoryUrl>https://github.com/zaid-ajaj/DustyTables</RepositoryUrl>
-        <Version>2.3.0</Version>
-        <PackageReleaseNotes>Add DateTimeOffset parameter variants</PackageReleaseNotes>
+        <Version>2.4.0</Version>
+        <PackageReleaseNotes>Make SqlProps fields public to allow for custom transformations and add Sql.executeRow(Async)</PackageReleaseNotes>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Configuration)'=='Release'">
         <Optimize>true</Optimize>
