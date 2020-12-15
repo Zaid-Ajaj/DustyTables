@@ -259,4 +259,20 @@ let tests = testList "DustyTables" [
            | Error ex -> raise ex
            | otherwise ->
               fail()
+
+    testDatabase "temp table loading" <| fun connectionString ->
+        let data = [ 1; 2; 3]
+
+        connectionString
+        |> Sql.connect
+        |> Sql.createTempTable "create table #Temp(Id int not null)"
+        |> Sql.tempTableData data
+        |> Sql.loadTempTable (fun row ->
+            [ "Id", Sql.int row ]
+        )
+        |> Sql.query "select Id from #Temp"
+        |> Sql.executeStream (fun read -> read.int "Id")
+        |> fun stream ->
+            let actual = stream |> Seq.toList
+            Expect.equal actual data "Result doesn't match"
   ]
