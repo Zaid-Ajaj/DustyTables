@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <TargetFrameworks>netstandard2.0;netcoreapp3.1</TargetFrameworks>
+        <TargetFrameworks>netstandard2.0</TargetFrameworks>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
     </PropertyGroup>
     <PropertyGroup>
         <Title>DustyTables</Title>
-        <Description>Thin F# API for SqlClient for easy data access to ms sql server with functional seasoning on top</Description>
+        <Description>Thin F# API for SqlClient for easy data access to MSSQL server with functional seasoning on top</Description>
         <PackageTags>f#, fsharp</PackageTags>
         <PackageProjectUrl>https://github.com/zaid-ajaj/DustyTables</PackageProjectUrl>
         <PackageLicenseUrl>https://github.com/zaid-ajaj/DustyTables/blob/master/LICENSE.md</PackageLicenseUrl>
@@ -14,8 +14,8 @@
         <RepositoryType>git</RepositoryType>
         <Authors>zaid-ajaj</Authors>
         <RepositoryUrl>https://github.com/zaid-ajaj/DustyTables</RepositoryUrl>
-        <Version>2.4.0</Version>
-        <PackageReleaseNotes>Make SqlProps fields public to allow for custom transformations and add Sql.executeRow(Async)</PackageReleaseNotes>
+        <Version>3.0.0</Version>
+        <PackageReleaseNotes>Major release. Use Tasks instead of Async and eliminate usage of results</PackageReleaseNotes>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Configuration)'=='Release'">
         <Optimize>true</Optimize>
@@ -26,6 +26,8 @@
         <Compile Include="Sql.fs" />
     </ItemGroup>
     <ItemGroup>
-        <PackageReference Include="Microsoft.Data.SqlClient" Version="2.0.0" />
+        <PackageReference Include="Microsoft.Data.SqlClient" Version="2.1.2" />
+        <PackageReference Include="Ply" Version="0.3.1" />
+        <PackageReference Update="FSharp.Core" Version="4.7.2" />
     </ItemGroup>
 </Project>

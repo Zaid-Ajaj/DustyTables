@@ -1,4 +1,4 @@
-# DustyTables
+# DustyTables [![Nuget](https://img.shields.io/nuget/v/DustyTables.svg?colorB=green)](https://www.nuget.org/packages/DustyTables)
 
 Functional wrapper around plain old (dusty?) `SqlClient` to simplify data access when talking to MS Sql Server databases.
 
@@ -6,9 +6,6 @@ Functional wrapper around plain old (dusty?) `SqlClient` to simplify data access
 ```bash
 # nuget client
 dotnet add package DustyTables
-
-# or using paket
-.paket/paket.exe add DustyTables --project path/to/project.fsproj
 ```
 
 ## Query a table
@@ -20,7 +17,7 @@ let connectionString() = Env.getVar "app_db"
 
 type User = { Id: int; Username: string }
 
-let getUsers() : Result<User list, exn> =
+let getUsers() : User list =
     connectionString()
     |> Sql.connect
     |> Sql.query "SELECT * FROM dbo.[Users]"
@@ -40,7 +37,7 @@ let connectionString() = Env.getVar "app_db"
 
 type User = { Id: int; Username: string; LastModified : Option<DateTime> }
 
-let getUsers() : Result<User list, exn> =
+let getUsers() : User list =
     connectionString()
     |> Sql.connect
     |> Sql.query "SELECT * FROM dbo.[users]"
@@ -61,7 +58,7 @@ let connectionString() = Env.getVar "app_db"
 
 type User = { Id: int; Username: string; Biography : string }
 
-let getUsers() : Result<User list, exn> =
+let getUsers() : User list =
     connectionString()
     |> Sql.connect
     |> Sql.query "select * from dbo.[users]"
@@ -80,7 +77,7 @@ open DustyTables
 let connectionString() = Env.getVar "app_db"
 
 // get product names by category
-let productsByCategory (category: string) : Result<string list, exn> =
+let productsByCategory (category: string) =
     connectionString()
     |> Sql.connect
     |> Sql.query "SELECT name FROM dbo.[Products] where category = @category"
@@ -95,19 +92,12 @@ open DustyTables
 let connectionString() = Env.getVar "app_db"
 
 // check whether a user exists or not
-let userExists (username: string) : Async<Result<bool, exn>> =
-    async {
-        return!
-            connectionString()
-            |> Sql.connect
-            |> Sql.storedProcedure "user_exists"
-            |> Sql.parameters [ "@username", Sql.string username ]
-            |> Sql.execute (fun read -> read.bool 0)
-            |> function
-                | Ok [ result ] -> Ok result
-                | Error error -> Error error
-                | unexpected -> failwithf "Expected result %A"  unexpected
-    }
+let userExists (username: string) : Async<bool> =
+    connectionString()
+    |> Sql.connect
+    |> Sql.storedProcedure "user_exists"
+    |> Sql.parameters [ "@username", Sql.string username ]
+    |> Sql.executeRow (fun read -> read.bool 0)
 ```
 ### Executing a stored procedure with table-valued parameters
 ```fs
@@ -137,35 +127,17 @@ let executeMyStoredProcedure () : Async<int> =
     |> Sql.executeNonQueryAsync
 ```
 
-## Running Tests locally
+## Building and running tests locally
 
 You only need a working local SQL server. The tests will create databases when required and dispose of them at the end of the each test
 
-## Builds
+```bash
+cd ./DustyTables.Build
 
-| MacOS/Linux                                                                                                                          | Windows                                                                                                                                                     |
-| ------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [![Travis Badge](https://travis-ci.org/Zaid-Ajaj/DustyTables.svg?branch=master)](https://travis-ci.org/Zaid-Ajaj/DustyTables)        | [![Build status](https://ci.appveyor.com/api/projects/status/github/Zaid-Ajaj/DustyTables?svg=true)](https://ci.appveyor.com/project/Zaid-Ajaj/DustyTables) |
-| [![Build History](https://buildstats.info/travisci/chart/Zaid-Ajaj/DustyTables)](https://travis-ci.org/Zaid-Ajaj/DustyTables/builds) | [![Build History](https://buildstats.info/appveyor/chart/Zaid-Ajaj/DustyTables)](https://ci.appveyor.com/project/Zaid-Ajaj/DustyTables)                     |
-
-
-## Nuget
-
-| Stable                                                                                                   | Prerelease                                                                                                                       |
-| -------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| [![NuGet Badge](https://buildstats.info/nuget/DustyTables)](https://www.nuget.org/packages/DustyTables/) | [![NuGet Badge](https://buildstats.info/nuget/DustyTables?includePreReleases=true)](https://www.nuget.org/packages/DustyTables/) |
-
----
-
-### Building
-
-
-Make sure the following **requirements** are installed in your system:
-
-* [dotnet SDK](https://www.microsoft.com/net/download/core) 2.0 or higher
-* [Mono](http://www.mono-project.com/) if you're on Linux or macOS.
-
-```
-> build.cmd // on windows
-$ ./build.sh  // on unix
+# Build the solution
+dotent run
+# Run the tests
+dotent run -- test
+# Publish the nuget
+dotnet run -- publish
 ```

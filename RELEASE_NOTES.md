@@ -1,3 +1,6 @@
+### 3.0.0 - 2021-03-28
+* Major rewrite: getting rid of Async in favor of Tasks and removing Result entirely
+
 ### 2.0.0 - 2020-04-29
 * Full rewrite and massive simplification
 

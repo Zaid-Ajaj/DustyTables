@@ -5,6 +5,7 @@ open System.Threading.Tasks
 open System.Data
 open Microsoft.Data.SqlClient
 open System.Threading
+open FSharp.Control.Tasks
 
 type Sql() =
     static member dbnull = SqlParameter(Value=DBNull.Value)
@@ -86,9 +87,7 @@ type Sql() =
         | None -> Sql.dbnull
 
     static member inline table(typeName: string, value: DataTable) =
-        SqlParameter(Value = value,
-                     TypeName = typeName,
-                     SqlDbType = SqlDbType.Structured)
+        SqlParameter(Value = value, TypeName = typeName, SqlDbType = SqlDbType.Structured)
 
     static member parameter(genericParameter: SqlParameter) = genericParameter
 
@@ -184,219 +183,193 @@ module Sql =
         with
         | error -> Error error
 
-    let executeTransactionAsync queries (props: SqlProps)  =
-        async {
-            try
-                let! token = Async.CancellationToken
-                use mergedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(token, props.CancellationToken)
-                let mergedToken = mergedTokenSource.Token
-                if List.isEmpty queries
-                then return Ok [ ]
-                else
-                let connection = getConnection props
-                try
-                    if not (connection.State.HasFlag ConnectionState.Open)
-                    then do! Async.AwaitTask (connection.OpenAsync mergedToken)
-                    use transaction = connection.BeginTransaction ()
-                    let affectedRowsByQuery = ResizeArray<int>()
-                    for (query, parameterSets) in queries do
-                        if List.isEmpty parameterSets
-                        then
-                          use command = new SqlCommand(query, connection, transaction)
-                          let! affectedRows = Async.AwaitTask (command.ExecuteNonQueryAsync mergedToken)
-                          affectedRowsByQuery.Add affectedRows
-                        else
-                          for parameterSet in parameterSets do
-                            use command = new SqlCommand(query, connection, transaction)
-                            populateRow command parameterSet
-                            let! affectedRows = Async.AwaitTask (command.ExecuteNonQueryAsync mergedToken)
-                            affectedRowsByQuery.Add affectedRows
-                    transaction.Commit()
-                    return Ok (List.ofSeq affectedRowsByQuery)
-                finally
-                    if props.ExistingConnection.IsNone
-                    then connection.Dispose()
-            with error ->
-                return Error error
-        }
-
-    let execute (read: RowReader -> 't) (props: SqlProps) : Result<'t list, exn> =
-        try
-            if props.SqlQuery.IsNone then failwith "No query provided to execute. Please use Sql.query"
+    let executeTransactionAsync queries (props: SqlProps) : Task<int list> =
+        task {
+            let! token = Async.CancellationToken
+            use mergedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(token, props.CancellationToken)
+            let mergedToken = mergedTokenSource.Token
+            if List.isEmpty queries
+            then return [ ]
+            else
             let connection = getConnection props
             try
                 if not (connection.State.HasFlag ConnectionState.Open)
-                then connection.Open()
-                use command = new SqlCommand(props.SqlQuery.Value, connection)
-                do populateCmd command props
-                if props.NeedPrepare then command.Prepare()
-                use reader = command.ExecuteReader()
-                let rowReader = RowReader(reader)
-                let result = ResizeArray<'t>()
-                while reader.Read() do result.Add (read rowReader)
-                Ok (List.ofSeq result)
+                then do! connection.OpenAsync mergedToken
+                use transaction = connection.BeginTransaction ()
+                let affectedRowsByQuery = ResizeArray<int>()
+                for (query, parameterSets) in queries do
+                    if List.isEmpty parameterSets
+                    then
+                        use command = new SqlCommand(query, connection, transaction)
+                        let! affectedRows = command.ExecuteNonQueryAsync mergedToken
+                        affectedRowsByQuery.Add affectedRows
+                    else
+                        for parameterSet in parameterSets do
+                            use command = new SqlCommand(query, connection, transaction)
+                            populateRow command parameterSet
+                            let! affectedRows = command.ExecuteNonQueryAsync mergedToken
+                            affectedRowsByQuery.Add affectedRows
+                transaction.Commit()
+                return List.ofSeq affectedRowsByQuery
             finally
                 if props.ExistingConnection.IsNone
                 then connection.Dispose()
-        with error ->
-            Error error
+        }
 
-    let executeRow (read: RowReader -> 't) (props: SqlProps) : Result<'t, exn> =
+    let execute (read: RowReader -> 't) (props: SqlProps) : 't list =
+        if props.SqlQuery.IsNone then failwith "No query provided to execute. Please use Sql.query"
+        let connection = getConnection props
         try
+            if not (connection.State.HasFlag ConnectionState.Open)
+            then connection.Open()
+            use command = new SqlCommand(props.SqlQuery.Value, connection)
+            do populateCmd command props
+            if props.NeedPrepare then command.Prepare()
+            use reader = command.ExecuteReader()
+            let rowReader = RowReader(reader)
+            let result = ResizeArray<'t>()
+            while reader.Read() do result.Add (read rowReader)
+            List.ofSeq result
+        finally
+            if props.ExistingConnection.IsNone
+            then connection.Dispose()
+
+    let executeRow (read: RowReader -> 't) (props: SqlProps) : 't =
+        if Option.isNone props.SqlQuery then failwith "No query provided to execute. Please use Sql.query"
+        let connection = getConnection props
+        try
+            if not (connection.State.HasFlag ConnectionState.Open)
+            then connection.Open()
+            use command = new SqlCommand(props.SqlQuery.Value, connection)
+            do populateCmd command props
+            if props.NeedPrepare then command.Prepare()
+            use reader = command.ExecuteReader()
+            let rowReader = RowReader(reader)
+            if reader.Read()
+            then read rowReader
+            else failwith "Expected at least one row to be returned from the result set. Instead the result set returned was empty"
+        finally
+            if props.ExistingConnection.IsNone
+            then connection.Dispose()
+
+    let executeRowAsync (read: RowReader -> 't) (props: SqlProps) : Task<'t> =
+        task {
+            let! token =  Async.CancellationToken
+            use mergedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(token, props.CancellationToken)
+            let mergedToken = mergedTokenSource.Token
             if Option.isNone props.SqlQuery then failwith "No query provided to execute. Please use Sql.query"
             let connection = getConnection props
             try
                 if not (connection.State.HasFlag ConnectionState.Open)
-                then connection.Open()
+                then do! connection.OpenAsync(mergedToken)
                 use command = new SqlCommand(props.SqlQuery.Value, connection)
                 do populateCmd command props
                 if props.NeedPrepare then command.Prepare()
-                use reader = command.ExecuteReader()
+                use! reader = command.ExecuteReaderAsync(mergedToken)
                 let rowReader = RowReader(reader)
                 if reader.Read()
-                then Ok (read rowReader)
-                else failwith "Expected at least one row to be returned from the result set. Instead it was empty"
+                then return read rowReader
+                else return! failwith "Expected at least one row to be returned from the result set. Instead it was empty"
             finally
                 if props.ExistingConnection.IsNone
                 then connection.Dispose()
-        with error ->
-            Error error
-
-    let executeRowAsync (read: RowReader -> 't) (props: SqlProps) : Async<Result<'t, exn>> =
-        async {
-            try
-                let! token =  Async.CancellationToken
-                use mergedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(token, props.CancellationToken)
-                let mergedToken = mergedTokenSource.Token
-                if Option.isNone props.SqlQuery then failwith "No query provided to execute. Please use Sql.query"
-                let connection = getConnection props
-                try
-                    if not (connection.State.HasFlag ConnectionState.Open)
-                    then do! Async.AwaitTask(connection.OpenAsync(mergedToken))
-                    use command = new SqlCommand(props.SqlQuery.Value, connection)
-                    do populateCmd command props
-                    if props.NeedPrepare then command.Prepare()
-                    use! reader = Async.AwaitTask (command.ExecuteReaderAsync(mergedToken))
-                    let rowReader = RowReader(reader)
-                    if reader.Read()
-                    then return Ok (read rowReader)
-                    else return! failwith "Expected at least one row to be returned from the result set. Instead it was empty"
-                finally
-                    if props.ExistingConnection.IsNone
-                    then connection.Dispose()
-            with error ->
-                return Error error
         }
 
-    let iter (read: RowReader -> unit) (props: SqlProps) : Result<unit, exn> =
+    /// <summary>Executes the query and runs each row through the input lambda</summary>
+    let iter (read: RowReader -> unit) (props: SqlProps) : unit =
+        if props.SqlQuery.IsNone then failwith "No query provided to execute. Please use Sql.query"
+        let connection = getConnection props
         try
+            if not (connection.State.HasFlag ConnectionState.Open)
+            then connection.Open()
+            use command = new SqlCommand(props.SqlQuery.Value, connection)
+            do populateCmd command props
+            if props.NeedPrepare then command.Prepare()
+            use reader = command.ExecuteReader()
+            let rowReader = RowReader(reader)
+            while reader.Read() do read rowReader
+        finally
+            if props.ExistingConnection.IsNone
+            then connection.Dispose()
+
+    /// <summary>Executes the query asynchronously and runs each row through the input lambda</summary>
+    let iterAsync (read: RowReader -> unit) (props: SqlProps) : Task =
+        unitTask {
+            let! token =  Async.CancellationToken
+            use mergedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(token, props.CancellationToken)
+            let mergedToken = mergedTokenSource.Token
             if props.SqlQuery.IsNone then failwith "No query provided to execute. Please use Sql.query"
             let connection = getConnection props
             try
                 if not (connection.State.HasFlag ConnectionState.Open)
-                then connection.Open()
+                then do! connection.OpenAsync(mergedToken)
                 use command = new SqlCommand(props.SqlQuery.Value, connection)
                 do populateCmd command props
                 if props.NeedPrepare then command.Prepare()
-                use reader = command.ExecuteReader()
+                use! reader = command.ExecuteReaderAsync(mergedToken)
                 let rowReader = RowReader(reader)
                 while reader.Read() do read rowReader
-                Ok ()
             finally
                 if props.ExistingConnection.IsNone
                 then connection.Dispose()
-        with error ->
-            Error error
-
-    let iterAsync (read: RowReader -> unit) (props: SqlProps) : Async<Result<unit, exn>> =
-        async {
-            try
-                let! token =  Async.CancellationToken
-                use mergedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(token, props.CancellationToken)
-                let mergedToken = mergedTokenSource.Token
-                if props.SqlQuery.IsNone then failwith "No query provided to execute. Please use Sql.query"
-                let connection = getConnection props
-                try
-                    if not (connection.State.HasFlag ConnectionState.Open)
-                    then do! Async.AwaitTask(connection.OpenAsync(mergedToken))
-                    use command = new SqlCommand(props.SqlQuery.Value, connection)
-                    do populateCmd command props
-                    if props.NeedPrepare then command.Prepare()
-                    use! reader = Async.AwaitTask (command.ExecuteReaderAsync(mergedToken))
-                    let rowReader = RowReader(reader)
-                    while reader.Read() do read rowReader
-                    return Ok ()
-                finally
-                    if props.ExistingConnection.IsNone
-                    then connection.Dispose()
-            with error ->
-                return Error error
         }
 
-    let executeAsync (read: RowReader -> 't) (props: SqlProps) : Async<Result<'t list, exn>> =
-        async {
-            try
-                let! token =  Async.CancellationToken
-                use mergedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(token, props.CancellationToken)
-                let mergedToken = mergedTokenSource.Token
-                if props.SqlQuery.IsNone then failwith "No query provided to execute. Please use Sql.query"
-                let connection = getConnection props
-                try
-                    if not (connection.State.HasFlag ConnectionState.Open)
-                    then do! Async.AwaitTask(connection.OpenAsync(mergedToken))
-                    use command = new SqlCommand(props.SqlQuery.Value, connection)
-                    do populateCmd command props
-                    if props.NeedPrepare then command.Prepare()
-                    use! reader = Async.AwaitTask (command.ExecuteReaderAsync(mergedToken))
-                    let rowReader = RowReader(reader)
-                    let result = ResizeArray<'t>()
-                    while reader.Read() do result.Add (read rowReader)
-                    return Ok (List.ofSeq result)
-                finally
-                    if props.ExistingConnection.IsNone
-                    then connection.Dispose()
-            with error ->
-                return Error error
-        }
-
-    /// Executes the query and returns the number of rows affected
-    let executeNonQuery (props: SqlProps) : Result<int, exn> =
-        try
-            if props.SqlQuery.IsNone then failwith "No query provided to execute..."
+    /// <summary>Executes the query asynchronously and maps each row using the input lambda to return a final list of the each mapped value</summary>
+    let executeAsync (read: RowReader -> 't) (props: SqlProps) : Task<'t list> =
+        task {
+            let! token =  Async.CancellationToken
+            use mergedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(token, props.CancellationToken)
+            let mergedToken = mergedTokenSource.Token
+            if props.SqlQuery.IsNone then failwith "No query provided to execute. Please use Sql.query"
             let connection = getConnection props
             try
                 if not (connection.State.HasFlag ConnectionState.Open)
-                then connection.Open()
+                then do! connection.OpenAsync(mergedToken)
                 use command = new SqlCommand(props.SqlQuery.Value, connection)
-                populateCmd command props
+                do populateCmd command props
                 if props.NeedPrepare then command.Prepare()
-                Ok (command.ExecuteNonQuery())
+                use! reader = command.ExecuteReaderAsync(mergedToken)
+                let rowReader = RowReader(reader)
+                let result = ResizeArray<'t>()
+                while reader.Read() do result.Add (read rowReader)
+                return List.ofSeq result
             finally
                 if props.ExistingConnection.IsNone
                 then connection.Dispose()
-        with
-            | error -> Error error
+        }
 
-    /// Executes the query as asynchronously and returns the number of rows affected
+    /// <summary>Executes the query and returns the number of rows affected</summary>
+    let executeNonQuery (props: SqlProps) : int =
+        if props.SqlQuery.IsNone then failwith "No query provided to execute..."
+        let connection = getConnection props
+        try
+            if not (connection.State.HasFlag ConnectionState.Open)
+            then connection.Open()
+            use command = new SqlCommand(props.SqlQuery.Value, connection)
+            populateCmd command props
+            if props.NeedPrepare then command.Prepare()
+            command.ExecuteNonQuery()
+        finally
+            if props.ExistingConnection.IsNone
+            then connection.Dispose()
+
+    /// <summary>Executes the query asynchronously and returns the number of rows affected</summary>
     let executeNonQueryAsync  (props: SqlProps) =
-        async {
+        task {
+            let! token = Async.CancellationToken
+            use mergedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(token, props.CancellationToken)
+            let mergedToken = mergedTokenSource.Token
+            if props.SqlQuery.IsNone then failwith "No query provided to execute. Please use Sql.query"
+            let connection = getConnection props
             try
-                let! token = Async.CancellationToken
-                use mergedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(token, props.CancellationToken)
-                let mergedToken = mergedTokenSource.Token
-                if props.SqlQuery.IsNone then failwith "No query provided to execute. Please use Sql.query"
-                let connection = getConnection props
-                try
-                    if not (connection.State.HasFlag ConnectionState.Open)
-                    then do! Async.AwaitTask (connection.OpenAsync(mergedToken))
-                    use command = new SqlCommand(props.SqlQuery.Value, connection)
-                    populateCmd command props
-                    if props.NeedPrepare then command.Prepare()
-                    let! affectedRows = Async.AwaitTask(command.ExecuteNonQueryAsync(mergedToken))
-                    return Ok affectedRows
-                finally
-                    if props.ExistingConnection.IsNone
-                    then connection.Dispose()
-            with
-            | error -> return Error error
+                if not (connection.State.HasFlag ConnectionState.Open)
+                then do! connection.OpenAsync(mergedToken)
+                use command = new SqlCommand(props.SqlQuery.Value, connection)
+                populateCmd command props
+                if props.NeedPrepare then command.Prepare()
+                let! affectedRows = command.ExecuteNonQueryAsync(mergedToken)
+                return Ok affectedRows
+            finally
+                if props.ExistingConnection.IsNone
+                then connection.Dispose()
         }

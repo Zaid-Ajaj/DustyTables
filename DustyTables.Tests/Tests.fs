@@ -28,7 +28,7 @@ let tests = testList "DustyTables" [
         |> Sql.query "select * from (values (1, N'john')) as users(id, username)"
         |> Sql.execute (fun read -> read.int "id", read.string "username")
         |> function
-           | Ok [ (1, "john") ] -> pass()
+           | [ (1, "john") ] -> pass()
            | otherwise -> fail()
 
     testDatabase "Iterating over the rows works" <| fun connectionString ->
@@ -37,12 +37,10 @@ let tests = testList "DustyTables" [
         |> Sql.connect
         |> Sql.query "select * from (values (1, N'john')) as users(id, username)"
         |> Sql.iter (fun read -> rows.Add(read.int "id", read.string "username"))
-        |> function
-           | Ok () ->
-                Expect.equal 1 (fst rows.[0]) "Number is read correctly"
-                Expect.equal "john" (snd rows.[0]) "String is read correctly"
-           | otherwise ->
-                fail()
+
+        Expect.equal 1 (fst rows.[0]) "Number is read correctly"
+        Expect.equal "john" (snd rows.[0]) "String is read correctly"
+
 
     testDatabase "Reading a parameterized query" <| fun connectionString ->
         connectionString
@@ -51,7 +49,7 @@ let tests = testList "DustyTables" [
         |> Sql.parameters [ "@userId", Sql.int 5; "@username", Sql.string "jane" ]
         |> Sql.execute (fun read -> read.int "id", read.string "username")
         |> function
-           | Ok [ (5, "jane") ] -> pass()
+           | [ (5, "jane") ] -> pass()
            | otherwise -> fail()
 
     testDatabase "Reading date time as scalar" <| fun connectionString ->
@@ -60,17 +58,8 @@ let tests = testList "DustyTables" [
         |> Sql.query "select getdate() as now"
         |> Sql.execute (fun read -> read.dateTime "now")
         |> function
-           | Ok [ time ] -> pass()
+           | [ time ] -> pass()
            | otherwise -> fail()
-
-    testDatabase "Sql.execute catches exceptions" <| fun connectionString ->
-        connectionString
-        |> Sql.connect
-        |> Sql.query "select some invalid SQL"
-        |> Sql.execute (fun read -> None)
-        |> function
-           | Error ex -> pass()
-           | Ok _ -> fail()
 
     testDatabase "Executing stored procedure" <| fun connectionString ->
         connectionString
@@ -79,8 +68,7 @@ let tests = testList "DustyTables" [
         |> Sql.parameters [ "@stmt", Sql.string "SELECT 42 AS A" ]
         |> Sql.execute (fun read -> read.int "A")
         |> function
-           | Ok [ 42 ]-> pass()
-           | Error error -> raise error
+           | [ 42 ] -> pass()
            | otherwise -> fail()
 
     testDatabase "Executing parameterized function in query" <| fun connectionString ->
@@ -90,7 +78,7 @@ let tests = testList "DustyTables" [
         |> Sql.parameters [ "@inputText", Sql.string "TEXT" ]
         |> Sql.execute (fun read -> read.string "output")
         |> function
-           | Ok [ "text" ] -> pass()
+           | [ "text" ] -> pass()
            | otherwise -> fail()
 
     testDatabase "binary roundtrip" <| fun connectionString ->
@@ -100,8 +88,7 @@ let tests = testList "DustyTables" [
         |> Sql.parameters [ "@blob", Sql.bytes [| byte 1; byte 2; byte 3 |] ]
         |> Sql.execute (fun read -> read.bytes "blob")
         |> function
-           | Ok [ bytes ] -> Expect.equal bytes [| byte 1; byte 2; byte 3 |] "bytes are the same"
-           | Error ex -> raise ex
+           | [ bytes ] -> Expect.equal bytes [| byte 1; byte 2; byte 3 |] "bytes are the same"
            | otherwise -> fail()
 
     testDatabase "reading unique identifier works" <| fun connectionString ->
@@ -110,8 +97,7 @@ let tests = testList "DustyTables" [
         |> Sql.query "select newid() as uid"
         |> Sql.execute (fun read -> read.uniqueidentifier "uid")
         |> function
-              | Ok [ value ] -> pass()
-              | Error ex -> raise ex
+              | [ value ] -> pass()
               | otherwise -> fail()
 
     testDatabase "unique identifier roundtrip" <| fun connectionString ->
@@ -122,8 +108,7 @@ let tests = testList "DustyTables" [
         |> Sql.parameters [ "@identifier", Sql.uniqueidentifier original ]
         |> Sql.execute (fun read -> read.uniqueidentifier "value")
         |> function
-              | Ok [ roundtripped ] -> Expect.equal original roundtripped "Roundtrip works"
-              | Error ex -> raise ex
+              | [ roundtripped ] -> Expect.equal original roundtripped "Roundtrip works"
               | otherwise -> fail()
 
     testDatabase "unique identifier roundtrip from string" <| fun connectionString ->
@@ -134,8 +119,7 @@ let tests = testList "DustyTables" [
         |> Sql.parameters [ "@identifier", Sql.uniqueidentifier original ]
         |> Sql.execute (fun read -> read.string "value")
         |> function
-              | Ok [ roundtripped ] -> Expect.equal (string original) roundtripped "Roundtrip works"
-              | Error ex -> raise ex
+              | [ roundtripped ] -> Expect.equal (string original) roundtripped "Roundtrip works"
               | otherwise -> fail()
 
     testDatabase "Simpy reading a single column from table" <| fun connectionString ->
@@ -143,74 +127,53 @@ let tests = testList "DustyTables" [
         |> Sql.connect
         |> Sql.query "select name from (values(N'one'), (N'two'), (N'three')) as numbers(name)"
         |> Sql.execute (fun read -> read.string "name")
-        |> function
-           | Ok [ "one"; "two"; "three" ] -> pass()
-           | Error ex -> raise ex
-           | otherwise -> fail()
+        |> fun output -> Expect.equal output [ "one"; "two"; "three" ] "The output is correct"
 
     testDatabase "reading count as int64" <| fun connectionString ->
         connectionString
         |> Sql.connect
         |> Sql.query "select count(*) from (values(1, 2)) as numbers(one, two)"
-        |> Sql.execute (fun read -> read.int64 0)
-        |> function
-            | Ok [ 1L ] -> pass()
-            | Ok otherwise -> fail()
-            | Error ex -> raise ex
+        |> Sql.executeRow (fun read -> read.int64 0)
+        |> fun count -> Expect.equal count 1L "Only one row is returned"
 
     testDatabase "reading count as int32" <| fun connectionString ->
         connectionString
         |> Sql.connect
         |> Sql.query "select count(*) from (values(1, 2)) as numbers(one, two)"
-        |> Sql.execute (fun read -> read.int 0)
-        |> function
-            | Ok [ 1 ] -> pass()
-            | Ok otherwise -> fail()
-            | Error ex -> raise ex
+        |> Sql.executeRow (fun read -> read.int 0)
+        |> fun count -> Expect.equal count 1 "Only one row is returned"
 
     testDatabase "decimal roundtrip" <| fun connectionString ->
         connectionString
         |> Sql.connect
         |> Sql.query "select @value as value"
         |> Sql.parameters [ "@value", Sql.decimal 1.234567M ]
-        |> Sql.execute (fun read -> read.decimal "value")
-        |> function
-            | Ok [ value ] -> Expect.equal value 1.234567M "decimal is correct"
-            | Error ex -> raise ex
-            | otherwise -> fail()
+        |> Sql.executeRow (fun read -> read.decimal "value")
+        |> fun value -> Expect.equal value 1.234567M "decimal is correct"
 
     testDatabase "reading double as decimal" <| fun connectionString ->
         connectionString
         |> Sql.connect
         |> Sql.query "select @value as value"
         |> Sql.parameters [ "@value", Sql.double 1.2345 ]
-        |> Sql.execute (fun read -> read.decimal "value")
-        |> function
-            | Ok [ value ] -> Expect.equal value 1.2345M "decimal is correct"
-            | Error ex -> raise ex
-            | otherwise -> fail()
+        |> Sql.executeRow (fun read -> read.decimal "value")
+        |> fun value -> Expect.equal value 1.2345M "decimal is correct"
 
     testDatabase "reading tinyint as int" <| fun connectionString ->
         connectionString
         |> Sql.connect
         |> Sql.query "SELECT CAST(@value as tinyint) as output"
         |> Sql.parameters [ "value", Sql.int 1 ]
-        |> Sql.execute (fun read -> read.int "output")
-        |> function
-            | Ok [ 1 ] -> pass()
-            | Error error -> raise error
-            | otherwise -> fail()
+        |> Sql.executeRow (fun read -> read.int "output")
+        |> fun value -> Expect.equal value 1 "output is correct"
 
     testDatabase "reading tinyint as int64" <| fun connectionString ->
         connectionString
         |> Sql.connect
         |> Sql.query "SELECT CAST(@value as tinyint) as output"
         |> Sql.parameters [ "value", Sql.int 1 ]
-        |> Sql.execute (fun read -> read.int64 "output")
-        |> function
-            | Ok [ 1L ] -> pass()
-            | Error error -> raise error
-            | otherwise -> fail()
+        |> Sql.executeRow (fun read -> read.int64 "output")
+        |> fun value -> Expect.equal value 1L "output is correct"
 
     testDatabase "table-valued parameters in a stored procedure" <| fun connectionString ->
         // create a custom SQL type
@@ -252,11 +215,10 @@ let tests = testList "DustyTables" [
         |> Sql.parameters ["@people", people]
         |> Sql.execute (fun read -> read.string "firstName" + " " + read.string "lastName")
         |> function
-           | Ok [ first; second; third ] ->
+           | [ first; second; third ] ->
               Expect.equal first "John Doe" "First name is John Doe"
               Expect.equal second "Jane Doe" "Second name is Jane Doe"
               Expect.equal third "Fred Doe" "Third name is Fred Doe"
-           | Error ex -> raise ex
            | otherwise ->
               fail()
   ]
