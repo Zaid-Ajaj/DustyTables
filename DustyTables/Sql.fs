@@ -150,38 +150,34 @@ module Sql =
 
         populateRow cmd props.Parameters
 
-    let executeTransaction queries (props: SqlProps) =
+    let executeTransaction queries (props: SqlProps) : int list =
+        if List.isEmpty queries
+        then [ ]
+        else
+        let connection = getConnection props
         try
-            if List.isEmpty queries
-            then Ok [ ]
-            else
-            let connection = getConnection props
-            try
-                if not (connection.State.HasFlag ConnectionState.Open)
-                then connection.Open()
-                use transaction = connection.BeginTransaction()
-                let affectedRowsByQuery = ResizeArray<int>()
-                for (query, parameterSets) in queries do
-                    if List.isEmpty parameterSets
-                    then
-                       use command = new SqlCommand(query, connection, transaction)
-                       let affectedRows = command.ExecuteNonQuery()
-                       affectedRowsByQuery.Add affectedRows
-                    else
-                      for parameterSet in parameterSets do
+            if not (connection.State.HasFlag ConnectionState.Open)
+            then connection.Open()
+            use transaction = connection.BeginTransaction()
+            let affectedRowsByQuery = ResizeArray<int>()
+            for (query, parameterSets) in queries do
+                if List.isEmpty parameterSets
+                then
+                    use command = new SqlCommand(query, connection, transaction)
+                    let affectedRows = command.ExecuteNonQuery()
+                    affectedRowsByQuery.Add affectedRows
+                else
+                    for parameterSet in parameterSets do
                         use command = new SqlCommand(query, connection, transaction)
                         populateRow command parameterSet
                         let affectedRows = command.ExecuteNonQuery()
                         affectedRowsByQuery.Add affectedRows
 
-                transaction.Commit()
-                Ok (List.ofSeq affectedRowsByQuery)
-            finally
-                if props.ExistingConnection.IsNone
-                then connection.Dispose()
-
-        with
-        | error -> Error error
+            transaction.Commit()
+            List.ofSeq affectedRowsByQuery
+        finally
+            if props.ExistingConnection.IsNone
+            then connection.Dispose()
 
     let executeTransactionAsync queries (props: SqlProps) : Task<int list> =
         task {
@@ -353,8 +349,8 @@ module Sql =
             if props.ExistingConnection.IsNone
             then connection.Dispose()
 
-    /// <summary>Executes the query asynchronously and returns the number of rows affected</summary>
-    let executeNonQueryAsync  (props: SqlProps) =
+    /// <summary>Executes the query asynchronously and returns the number of affected rows</summary>
+    let executeNonQueryAsync  (props: SqlProps) : Task<int> =
         task {
             let! token = Async.CancellationToken
             use mergedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(token, props.CancellationToken)
@@ -368,7 +364,7 @@ module Sql =
                 populateCmd command props
                 if props.NeedPrepare then command.Prepare()
                 let! affectedRows = command.ExecuteNonQueryAsync(mergedToken)
-                return Ok affectedRows
+                return affectedRows
             finally
                 if props.ExistingConnection.IsNone
                 then connection.Dispose()

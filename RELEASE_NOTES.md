@@ -1,3 +1,6 @@
+### 4.0.0 - 2012-05-28
+* Don't return `Result` from the function `Sql.executeNonQueryAsync` and `Sql.executeTransaction`, use `int` and `int list` as return types, respectively.
+
 ### 3.0.0 - 2021-03-28
 * Major rewrite: getting rid of Async in favor of Tasks and removing Result entirely
 

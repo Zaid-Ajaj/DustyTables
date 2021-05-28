@@ -92,7 +92,7 @@ open DustyTables
 let connectionString() = Env.getVar "app_db"
 
 // check whether a user exists or not
-let userExists (username: string) : Async<bool> =
+let userExists (username: string) : bool =
     connectionString()
     |> Sql.connect
     |> Sql.storedProcedure "user_exists"
