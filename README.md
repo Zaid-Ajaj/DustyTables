@@ -129,7 +129,7 @@ let executeMyStoredProcedure () : Async<int> =
 
 ## Building and running tests locally
 
-You only need a working local SQL server. The tests will create databases when required and dispose of them at the end of the each test
+You only need a working local SQL server. The tests will create databases when required and dispose them at the end of each test.
 
 ```bash
 cd ./DustyTables.Build
